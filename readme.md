@@ -2,14 +2,23 @@
 
 A unified system to streamline and automate the creation of college reports, notices, and official documents—with consistent branding, efficient workflows, and AI-enhanced content generation.
 
-## Features
+## Project Objectives
+- **Consistent Documents**: Ensure all college documents have a uniform look and style.
+- **Save Time**: Automate routine tasks to reduce manual work.
+- **Teamwork**: Allow staff and faculty to collaborate easily on documents.
+- **Error-Free**: Use templates and user roles to reduce mistakes and maintain standards.
+- **Go Paperless**: Support fully digital creation, approval, and storage of documents.
+- **Use AI Smartly**: Help draft and improve text with AI to boost productivity.
 
-- **Template Management**: Create and manage reusable document templates
-- **Manual Entry and Image Upload**: Interactive forms for document creation
-- **AI-Powered Text Generation**: Generate and refine formal text using open-source models
-- **Real-Time Preview & PDF Export**: Live document preview and PDF generation
-- **Role-Based Access & Security**: Secure authentication and authorization
-- **File Handling**: Upload, store, and embed media within documents
+## Features
+- **Approval Workflow**: Easy review and approval with tracking.
+- **User Roles**: Different access levels for faculty, and admins.
+- **Search & Filters**: Quickly find documents by keywords, dates, or authors.
+- **Bulk Document Creation**: Generate many letters or certificates from data files at once.
+- **Digital Signatures**: Sign documents securely online.
+- **Mobile Friendly**: Create and approve documents on any device.
+- **Analytics Dashboard**: Visualize document stats and approval times.
+
 
 ## Tech Stack
 
