@@ -7,8 +7,7 @@ A unified system to streamline and automate the creation of college reports, not
 - **Process Automation**: Streamline repetitive administrative tasks through workflow automation and rule-based triggers.
 - **Collaborative Editing**: Enable concurrent multi-user access with role-based permissions and version control for document collaboration.
 - **Quality Assurance & Compliance**: Implement template validation and access control mechanisms to minimize errors and ensure regulatory compliance.
-- **Digital Document Lifecycle Management**: Facilitate end-to-end digital creation, approval, storage, and archival within a secure content management system.
-- **AI-Driven Content Generation**: Integrate natural language generation models to assist in drafting and refining formal document content, enhancing productivity and reducing manual effort.
+- **AI-Driven Content Generation**: Use OpenAI API to assist in drafting and refining formal document content, enhancing productivity and reducing manual effort.
 
 
 ## Features
