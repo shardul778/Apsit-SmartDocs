@@ -28,7 +28,7 @@ import {
   VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import { userService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, AlertMessage } from '../common';
 
 // User form validation schema
@@ -62,7 +62,7 @@ const UserForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
-  const { user: currentUser } = useContext(AuthContext);
+  const { user: currentUser } = useAuth();
   const isEditMode = Boolean(id);
   
   const [user, setUser] = useState(null);

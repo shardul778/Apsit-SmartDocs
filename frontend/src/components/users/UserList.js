@@ -36,12 +36,12 @@ import {
   Person as UserIcon
 } from '@mui/icons-material';
 import { userService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } from '../common';
 
 const UserList = () => {
   const theme = useTheme();
-  const { user: currentUser } = useContext(AuthContext);
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);

@@ -35,12 +35,12 @@ import {
   FilterList as FilterListIcon
 } from '@mui/icons-material';
 import { documentService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } from '../common';
 
 const DocumentList = () => {
   const theme = useTheme();
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -167,7 +167,7 @@ const DocumentList = () => {
   // Handle download document as PDF
   const handleDownloadPdf = async (documentId) => {
     try {
-      await documentService.generatePdf(documentId);
+      await documentService.generatePDF(documentId);
       // The actual download will be handled by the browser
     } catch (error) {
       console.error('Error downloading document:', error);

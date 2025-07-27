@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
@@ -25,7 +25,7 @@ import {
   ArrowBack as ArrowBackIcon
 } from '@mui/icons-material';
 import { documentService, templateService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, AlertMessage, ConfirmDialog } from '../common';
 
 // Rich text editor (using a placeholder, you can replace with your preferred editor)
@@ -42,8 +42,7 @@ const DocumentSchema = Yup.object().shape({
 const DocumentForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const isEditMode = Boolean(id);
   
   const [document, setDocument] = useState(null);
