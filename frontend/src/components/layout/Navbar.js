@@ -92,7 +92,7 @@ const Navbar = () => {
               textDecoration: 'none',
             }}
           >
-            College Docs
+            SmartDocs
           </Typography>
 
           {/* Mobile menu */}
@@ -157,7 +157,7 @@ const Navbar = () => {
               textDecoration: 'none',
             }}
           >
-            College Docs
+            SmartDocs
           </Typography>
 
           {/* Desktop menu */}

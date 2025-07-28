@@ -63,7 +63,7 @@ const Sidebar = ({ open, onClose, variant = 'permanent' }) => {
     <>
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" component="div" sx={{ fontWeight: 'bold' }}>
-          College Docs
+          SmartDocs
         </Typography>
       </Box>
       <Divider />

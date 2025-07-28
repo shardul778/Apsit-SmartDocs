@@ -84,7 +84,7 @@ const Login = () => {
             Welcome Back
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Sign in to your College Document Automation System account
+            Sign in to SmartDocs account
           </Typography>
         </Box>
 

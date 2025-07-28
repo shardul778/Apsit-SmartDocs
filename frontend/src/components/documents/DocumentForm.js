@@ -16,8 +16,7 @@ import {
   Paper,
   Select,
   TextField,
-  Typography,
-  useTheme
+  Typography
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -378,7 +377,7 @@ const DocumentForm = () => {
                   
                   <Box sx={{ mb: 2 }}>
                     <Editor
-                      apiKey="your-tinymce-api-key" // Replace with your TinyMCE API key
+                      apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
                       value={values.content}
                       init={{
                         height: 500,
@@ -389,6 +388,7 @@ const DocumentForm = () => {
                           'insertdatetime media table paste code help wordcount'
                         ],
                         toolbar:
+                          // eslint-disable-next-line no-multi-str
                           'undo redo | formatselect | bold italic backcolor | \
                           alignleft aligncenter alignright alignjustify | \
                           bullist numlist outdent indent | removeformat | help'

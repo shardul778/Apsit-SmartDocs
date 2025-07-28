@@ -21,7 +21,7 @@ const Footer = () => {
           {currentYear}
           {' '}
           <Link color="inherit" href="#">
-            College Document Automation System
+            SmartDocs
           </Link>
           {' | All Rights Reserved'}
         </Typography>

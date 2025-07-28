@@ -126,7 +126,7 @@ const Register = () => {
             Create Account
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Join the College Document Automation System
+            Join the SmartDocs
           </Typography>
         </Box>
 

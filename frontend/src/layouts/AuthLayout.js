@@ -24,7 +24,7 @@ const AuthLayout = () => {
           }}
         >
           <Typography component="h1" variant="h4" sx={{ mb: 2 }}>
-            College Document Automation
+            SmartDocs
           </Typography>
           <Outlet />
         </Paper>
@@ -40,7 +40,7 @@ const AuthLayout = () => {
       >
         <Container maxWidth="sm">
           <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} College Document Automation
+            © {new Date().getFullYear()} SmartDocs
           </Typography>
         </Container>
       </Box>
