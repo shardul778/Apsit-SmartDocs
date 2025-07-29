@@ -17,7 +17,10 @@ export const getUsers = async (filters = {}) => {
   const url = queryString ? `${API_URL}?${queryString}` : API_URL;
   
   const response = await axios.get(url);
-  return response.data;
+  return {
+    users: response.data.data,
+    totalCount: response.data.total
+  };
 };
 
 // Get user by ID (admin only)
