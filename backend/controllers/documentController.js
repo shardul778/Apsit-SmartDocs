@@ -4,6 +4,7 @@ const { validationResult } = require('express-validator');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
 /**
  * @desc    Create a new document
@@ -54,6 +55,119 @@ exports.createDocument = async (req, res, next) => {
 };
 
 /**
+ * @desc    Upload attachment to a document
+ * @route   POST /api/documents/:id/attachments
+ * @access  Private
+ */
+exports.uploadAttachment = async (req, res) => {
+  try {
+    // Check if document exists and user has permission
+    const document = await Document.findById(req.params.id);
+    
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    
+    // Check if user is admin or document creator
+    if (!req.user.isAdmin && document.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to upload attachments to this document' });
+    }
+    
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    // Create attachment object
+    const attachment = {
+      filename: req.file.originalname,
+      path: req.file.path,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      uploadedAt: new Date()
+    };
+    
+    // Add attachment to document
+    document.attachments = document.attachments || [];
+    document.attachments.push(attachment);
+    
+    // Save document
+    await document.save();
+    
+    res.status(200).json({
+      success: true,
+      data: attachment,
+      message: 'Attachment uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Error uploading attachment:', error);
+    if (error instanceof mongoose.Error.CastError) {
+      return res.status(400).json({ message: 'Invalid document ID format' });
+    }
+    res.status(500).json({ message: 'Server error uploading attachment' });
+  }
+};
+
+/**
+ * @desc    Delete attachment from a document
+ * @route   DELETE /api/documents/:id/attachments/:attachmentId
+ * @access  Private
+ */
+exports.deleteAttachment = async (req, res) => {
+  try {
+    // Check if document exists and user has permission
+    const document = await Document.findById(req.params.id);
+    
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    
+    // Check if user is admin or document creator
+    if (!req.user.isAdmin && document.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete attachments from this document' });
+    }
+    
+    // Find the attachment by ID
+    const attachmentId = req.params.attachmentId;
+    const attachmentIndex = document.attachments.findIndex(a => a._id.toString() === attachmentId);
+    
+    if (attachmentIndex === -1) {
+      return res.status(404).json({ message: 'Attachment not found' });
+    }
+    
+    // Get the attachment to delete its file
+    const attachmentToDelete = document.attachments[attachmentIndex];
+    
+    // Remove the file from the filesystem
+    try {
+      if (fs.existsSync(attachmentToDelete.path)) {
+        fs.unlinkSync(attachmentToDelete.path);
+      }
+    } catch (err) {
+      console.error('Error deleting attachment file:', err);
+      // Continue with removing from database even if file deletion fails
+    }
+    
+    // Remove attachment from document
+    document.attachments.splice(attachmentIndex, 1);
+    
+    // Save document
+    await document.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Attachment deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting attachment:', error);
+    if (error instanceof mongoose.Error.CastError) {
+      return res.status(400).json({ message: 'Invalid document or attachment ID format' });
+    }
+    res.status(500).json({ message: 'Server error deleting attachment' });
+  }
+};
+
+/**
  * @desc    Get all documents
  * @route   GET /api/documents
  * @access  Private
@@ -67,7 +181,6 @@ exports.getDocuments = async (req, res, next) => {
     if (req.user.role !== 'admin') {
       query.createdBy = req.user._id;
     }
-
     // Filter by status if provided
     if (req.query.status) {
       query.status = req.query.status;

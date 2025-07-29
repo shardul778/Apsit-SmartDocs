@@ -151,13 +151,13 @@ export const AuthProvider = ({ children }) => {
         },
       });
       
-      // Update user state with new profile image
+      // Update user state to indicate profile image exists
       setUser({
         ...user,
-        profileImage: response.data.profileImage,
+        hasProfileImage: true
       });
       
-      return { success: true, profileImage: response.data.profileImage };
+      return { success: true, message: response.data.message };
     } catch (error) {
       const message = error.response?.data?.message || 'Image upload failed. Please try again.';
       setError(message);
@@ -165,6 +165,12 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Get profile image URL
+  const getProfileImageUrl = () => {
+    if (!user || !user.hasProfileImage) return null;
+    return `/api/auth/profile/image?${new Date().getTime()}`; // Add timestamp to prevent caching
   };
 
   // Upload signature
@@ -182,13 +188,13 @@ export const AuthProvider = ({ children }) => {
         },
       });
       
-      // Update user state with new signature
+      // Update user state to indicate signature exists
       setUser({
         ...user,
-        signature: response.data.signature,
+        hasSignature: true
       });
       
-      return { success: true, signature: response.data.signature };
+      return { success: true, message: response.data.message };
     } catch (error) {
       const message = error.response?.data?.message || 'Signature upload failed. Please try again.';
       setError(message);
@@ -196,6 +202,12 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Get signature URL
+  const getSignatureUrl = () => {
+    if (!user || !user.hasSignature) return null;
+    return `/api/auth/profile/signature?${new Date().getTime()}`; // Add timestamp to prevent caching
   };
 
   // Change password
@@ -229,7 +241,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     uploadProfileImage,
+    getProfileImageUrl,
     uploadSignature,
+    getSignatureUrl,
     changePassword,
     clearError,
   };

@@ -1,16 +1,19 @@
 const express = require('express');
 const { check } = require('express-validator');
+const multer = require('multer');
 const { 
   register, 
   login, 
   getMe, 
   updateProfile, 
   uploadProfileImage, 
+  getProfileImage,
   uploadSignature, 
+  getSignature,
   changePassword 
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
-const { upload, handleUploadError } = require('../middleware/upload');
+const { upload, handleUploadError, fileFilter } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -54,19 +57,25 @@ router.put(
 router.put(
   '/profile/image',
   protect,
-  upload.single('profileImage'),
+  multer({ storage: multer.memoryStorage(), fileFilter }).single('profileImage'),
   handleUploadError,
   uploadProfileImage
 );
+
+// Get profile image
+router.get('/profile/image', protect, getProfileImage);
 
 // Upload signature
 router.put(
   '/profile/signature',
   protect,
-  upload.single('signature'),
+  multer({ storage: multer.memoryStorage(), fileFilter }).single('signature'),
   handleUploadError,
   uploadSignature
 );
+
+// Get signature
+router.get('/profile/signature', protect, getSignature);
 
 // Change password
 router.put(

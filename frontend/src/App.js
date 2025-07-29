@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline } from '@mui/material';
 import { useAuth } from './context/AuthContext';
-import { useTheme } from './context/ThemeContext';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -16,6 +15,7 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 // Main Pages
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 // Document Pages
 import DocumentList from './pages/documents/DocumentList';
@@ -52,7 +52,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 };
 
 function App() {
-  const { theme } = useTheme();
   const { isAuthenticated } = useAuth();
   
   return (
@@ -75,6 +74,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           
           {/* Document Routes */}
           <Route path="/documents" element={<DocumentList />} />

@@ -43,6 +43,16 @@ const DocumentSchema = new mongoose.Schema(
       type: String, // Path to generated PDF
       default: null,
     },
+    attachments: [{
+      filename: String,
+      path: String,
+      mimetype: String,
+      size: Number,
+      uploadedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     metadata: {
       documentNumber: {
         type: String,

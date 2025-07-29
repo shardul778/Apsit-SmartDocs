@@ -28,7 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { PageHeader, AlertMessage, LoadingSpinner } from '../common';
 
 const Profile = () => {
-  const { user, updateProfile, uploadProfileImage, uploadSignature, changePassword } = useAuth();
+  const { user, updateProfile, uploadProfileImage, getProfileImageUrl, uploadSignature, getSignatureUrl, changePassword } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ open: false, message: '', severity: 'success' });
@@ -246,7 +246,7 @@ const Profile = () => {
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Box sx={{ position: 'relative', mb: 3 }}>
                       <Avatar
-                        src={user?.profileImage}
+                        src={getProfileImageUrl()}
                         alt={user?.name}
                         sx={{ width: 150, height: 150, mb: 2 }}
                       />
@@ -328,10 +328,10 @@ const Profile = () => {
                         position: 'relative',
                       }}
                     >
-                      {user?.signature ? (
+                      {user?.hasSignature ? (
                         <Box
                           component="img"
-                          src={user.signature}
+                          src={getSignatureUrl()}
                           alt="Signature"
                           sx={{ maxWidth: '100%', maxHeight: 100 }}
                         />

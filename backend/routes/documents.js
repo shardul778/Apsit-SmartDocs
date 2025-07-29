@@ -15,7 +15,9 @@ const {
   submitDocument,
   approveDocument,
   rejectDocument,
-  generatePDF
+  generatePDF,
+  uploadAttachment,
+  deleteAttachment
 } = require('../controllers/documentController');
 
 // All routes below this are protected
@@ -56,6 +58,12 @@ router.put('/:id/submit', submitDocument);
 
 // Generate PDF
 router.post('/:id/pdf', generatePDF);
+
+// Upload attachment to document
+router.post('/:id/attachments', upload.single('attachment'), handleUploadError, uploadAttachment);
+
+// Delete attachment from document
+router.delete('/:id/attachments/:attachmentId', deleteAttachment);
 
 // Admin only routes
 router.use(authorize('admin'));

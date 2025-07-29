@@ -42,7 +42,7 @@ import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } f
 const UserList = () => {
   const theme = useTheme();
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState(null);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -317,8 +317,14 @@ const UserList = () => {
       </Card>
 
       {/* Users table */}
+      // Modify the condition in the render section
       {loading ? (
         <LoadingSpinner message="Loading users..." />
+      ) : !users ? (
+        <EmptyState 
+          message="Error loading users"
+          description="There was a problem loading the user list. Please try again."
+        />
       ) : users.length === 0 ? (
         <EmptyState 
           message="No users found"

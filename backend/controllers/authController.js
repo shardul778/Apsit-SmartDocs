@@ -147,8 +147,8 @@ exports.getMe = async (req, res, next) => {
         role: req.user.role,
         department: req.user.department,
         position: req.user.position,
-        profileImage: req.user.profileImage,
-        signature: req.user.signature,
+        hasProfileImage: req.user.profileImage && req.user.profileImage.data ? true : false,
+        hasSignature: req.user.signature && req.user.signature.data ? true : false,
       },
     });
   } catch (error) {
@@ -220,8 +220,11 @@ exports.uploadProfileImage = async (req, res, next) => {
       });
     }
 
-    // Get file path
-    const profileImage = `/uploads/images/${req.file.filename}`;
+    // Store image data in database
+    const profileImage = {
+      data: req.file.buffer,
+      contentType: req.file.mimetype
+    };
 
     // Update user profile image
     const updatedUser = await User.findByIdAndUpdate(
@@ -233,7 +236,7 @@ exports.uploadProfileImage = async (req, res, next) => {
     // Return updated user data
     res.status(200).json({
       success: true,
-      profileImage,
+      message: 'Profile image uploaded successfully'
     });
   } catch (error) {
     next(error);
@@ -255,8 +258,11 @@ exports.uploadSignature = async (req, res, next) => {
       });
     }
 
-    // Get file path
-    const signature = `/uploads/signatures/${req.file.filename}`;
+    // Store signature data in database
+    const signature = {
+      data: req.file.buffer,
+      contentType: req.file.mimetype
+    };
 
     // Update user signature
     const updatedUser = await User.findByIdAndUpdate(
@@ -268,7 +274,7 @@ exports.uploadSignature = async (req, res, next) => {
     // Return updated user data
     res.status(200).json({
       success: true,
-      signature,
+      message: 'Signature uploaded successfully'
     });
   } catch (error) {
     next(error);
@@ -314,6 +320,52 @@ exports.changePassword = async (req, res, next) => {
       success: true,
       message: 'Password updated successfully',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get profile image
+ * @route   GET /api/auth/profile/image
+ * @access  Private
+ */
+exports.getProfileImage = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user || !user.profileImage || !user.profileImage.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Profile image not found',
+      });
+    }
+    
+    res.set('Content-Type', user.profileImage.contentType);
+    return res.send(user.profileImage.data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get signature
+ * @route   GET /api/auth/profile/signature
+ * @access  Private
+ */
+exports.getSignature = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user || !user.signature || !user.signature.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Signature not found',
+      });
+    }
+    
+    res.set('Content-Type', user.signature.contentType);
+    return res.send(user.signature.data);
   } catch (error) {
     next(error);
   }

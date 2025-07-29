@@ -37,12 +37,12 @@ const UserSchema = new mongoose.Schema(
       trim: true,
     },
     profileImage: {
-      type: String,
-      default: null,
+      data: Buffer,
+      contentType: String,
     },
     signature: {
-      type: String,
-      default: null,
+      data: Buffer,
+      contentType: String,
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
