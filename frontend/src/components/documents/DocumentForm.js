@@ -26,6 +26,7 @@ import {
 import { documentService, templateService } from '../../services';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, AlertMessage, ConfirmDialog } from '../common';
+import aiTextPlugin from '../../plugins/aiTextPlugin';
 
 // Rich text editor (using a placeholder, you can replace with your preferred editor)
 import { Editor } from '@tinymce/tinymce-react';
@@ -391,7 +392,10 @@ const DocumentForm = () => {
                           // eslint-disable-next-line no-multi-str
                           'undo redo | formatselect | bold italic backcolor | \
                           alignleft aligncenter alignright alignjustify | \
-                          bullist numlist outdent indent | removeformat | help'
+                          bullist numlist outdent indent | aitext templates citation tableofcontents | removeformat | help',
+                        setup: (editor) => {
+                          aiTextPlugin(editor);
+                        }
                       }}
                       onEditorChange={(content) => setFieldValue('content', content)}
                     />
