@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from './axiosConfig';
 
 const API_URL = '/api/users';
 
@@ -17,10 +17,7 @@ export const getUsers = async (filters = {}) => {
   const url = queryString ? `${API_URL}?${queryString}` : API_URL;
   
   const response = await axios.get(url);
-  return {
-    users: response.data.data,
-    totalCount: response.data.total
-  };
+  return response.data; // Return the entire response.data object
 };
 
 // Get user by ID (admin only)

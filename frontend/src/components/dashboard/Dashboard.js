@@ -313,7 +313,7 @@ const Dashboard = () => {
                   description="Create your first document to get started"
                   icon={<DocumentIcon sx={{ fontSize: 64 }} />}
                   actionText="Create Document"
-                  actionLink="/documents/create"
+                  onActionClick={() => navigate('/documents/create')}
                 />
               )}
             </CardContent>

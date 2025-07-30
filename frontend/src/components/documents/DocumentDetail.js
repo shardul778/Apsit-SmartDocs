@@ -181,21 +181,18 @@ const DocumentDetail = () => {
   };
 
   // Check if user can edit the document
-  const canEditDocument = () => {
-    if (!document || !user) return false;
-    return document.userId === user.id || user.role === 'admin';
+  const canEditDocument = (document) => {
+    return document.userId === user._id || user.role === 'admin';
   };
 
   // Check if user can delete the document
-  const canDeleteDocument = () => {
-    if (!document || !user) return false;
-    return document.userId === user.id || user.role === 'admin';
+  const canDeleteDocument = (document) => {
+    return document.userId === user._id || user.role === 'admin';
   };
 
   // Check if user can submit the document for approval
-  const canSubmitDocument = () => {
-    if (!document || !user) return false;
-    return (document.userId === user.id || user.role === 'admin') && document.status === 'draft';
+  const canSubmitDocument = (document) => {
+    return (document.userId === user._id || user.role === 'admin') && document.status === 'draft';
   };
 
   // Check if user can approve/reject the document
@@ -236,7 +233,7 @@ const DocumentDetail = () => {
     <Box sx={{ p: 3 }}>
       <PageHeader 
         title={document.title}
-        subtitle={`Document ID: ${document.id}`}
+        subtitle={`Document ID: ${document._id}`}
         breadcrumbs={[
           { label: 'Dashboard', link: '/' },
           { label: 'Documents', link: '/documents' },

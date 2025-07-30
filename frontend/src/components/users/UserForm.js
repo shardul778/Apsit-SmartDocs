@@ -209,7 +209,7 @@ const UserForm = () => {
     <Box sx={{ p: 3 }}>
       <PageHeader 
         title={isEditMode ? 'Edit User' : 'Create User'}
-        subtitle={isEditMode ? `Editing: ${user?.name}` : 'Create a new user'}
+        subtitle={isEditMode ? `Editing: ${user.name}` : 'Create a new user'}
         breadcrumbs={[
           { label: 'Dashboard', link: '/' },
           { label: 'Users', link: '/users' },

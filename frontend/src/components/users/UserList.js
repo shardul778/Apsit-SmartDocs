@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -41,6 +41,7 @@ import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } f
 
 const UserList = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,8 +82,8 @@ const UserList = () => {
         limit: rowsPerPage,
         ...filters
       });
-      setUsers(response.users);
-      setTotalCount(response.totalCount);
+      setUsers(response.data); // Update to use response.data instead of response.users
+      setTotalCount(response.total);
     } catch (error) {
       console.error('Error fetching users:', error);
       setAlert({
@@ -140,10 +141,10 @@ const UserList = () => {
 
   // Handle delete user
   const handleDeleteUser = async () => {
-    if (!userToDelete) return;
+    if (!userToDelete || !userToDelete._id) return;
     
     try {
-      await userService.deleteUser(userToDelete.id);
+      await userService.deleteUser(userToDelete._id);
       setAlert({
         open: true,
         message: 'User deleted successfully',
@@ -197,7 +198,7 @@ const UserList = () => {
   // Check if user can be deleted
   const canDeleteUser = (user) => {
     // Cannot delete yourself or other admins if you're not a super admin
-    return user.id !== currentUser?.id && !(user.role === 'admin' && currentUser?.role !== 'superadmin');
+    return user._id !== currentUser?._id && !(user.role === 'admin' && currentUser?.role !== 'superadmin');
   };
 
   if (currentUser?.role !== 'admin') {
@@ -230,12 +231,9 @@ const UserList = () => {
           { label: 'Dashboard', link: '/' },
           { label: 'Users', link: '/users' }
         ]}
-        action={{
-          label: 'Add User',
-          icon: <AddIcon />,
-          onClick: () => {/* Navigate to create user page */},
-          link: '/users/create'
-        }}
+        actionText="Add User"
+        actionIcon={<AddIcon />}
+        onActionClick={() => navigate('/users/create')}
       />
 
       {/* Search and filter section */}
@@ -317,7 +315,6 @@ const UserList = () => {
       </Card>
 
       {/* Users table */}
-      // Modify the condition in the render section
       {loading ? (
         <LoadingSpinner message="Loading users..." />
       ) : !users ? (
@@ -329,10 +326,8 @@ const UserList = () => {
         <EmptyState 
           message="No users found"
           description="Create a new user or adjust your filters to see results."
-          action={{
-            label: 'Add User',
-            link: '/users/create'
-          }}
+          actionText="Add User"
+          onActionClick={() => navigate('/users/create')}
         />
       ) : (
         <Paper sx={{ width: '100%', overflow: 'hidden' }}>
@@ -350,7 +345,7 @@ const UserList = () => {
               </TableHead>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow hover key={user.id}>
+                  <TableRow hover key={user._id}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {getUserAvatar(user)}
@@ -376,8 +371,7 @@ const UserList = () => {
                     <TableCell align="right">
                       <Tooltip title="Edit">
                         <IconButton 
-                          component={Link} 
-                          to={`/users/${user.id}/edit`}
+                          onClick={() => navigate(`/users/${user._id}/edit`)}
                           size="small"
                         >
                           <EditIcon fontSize="small" />

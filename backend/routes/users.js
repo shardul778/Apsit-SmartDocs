@@ -25,6 +25,7 @@ router.get('/', getUsers);
 // Get single user
 router.get('/:id', getUser);
 
+
 // Create user
 router.post(
   '/',
