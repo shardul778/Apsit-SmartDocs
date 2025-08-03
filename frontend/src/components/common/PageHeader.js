@@ -56,12 +56,12 @@ const PageHeader = ({
           <Button
             variant="contained"
             color="primary"
-            startIcon={actionIcon}
-            component={actionLink ? RouterLink : 'button'}
-            to={actionLink}
-            onClick={onActionClick}
+            startIcon={action?.icon || actionIcon}
+            component={(action?.link || actionLink) ? RouterLink : 'button'}
+            to={action?.link || actionLink}
+            onClick={action?.onClick || onActionClick}
           >
-            {actionText || 'Action'}
+            {action?.label || actionText || 'Create'}
           </Button>
         )}
       </Box>

@@ -27,6 +27,7 @@ import DocumentView from './pages/documents/DocumentView';
 import TemplateList from './pages/templates/TemplateList';
 import TemplateCreate from './pages/templates/TemplateCreate';
 import TemplateEdit from './pages/templates/TemplateEdit';
+import TemplateDetail from './pages/templates/TemplateDetail';
 
 // User Pages
 import UserList from './pages/users/UserList';
@@ -91,6 +92,11 @@ function App() {
           <Route path="/templates/create" element={
             <ProtectedRoute requiredRole="admin">
               <TemplateCreate />
+            </ProtectedRoute>
+          } />
+          <Route path="/templates/:id" element={
+            <ProtectedRoute requiredRole="admin">
+              <TemplateDetail />
             </ProtectedRoute>
           } />
           <Route path="/templates/:id/edit" element={

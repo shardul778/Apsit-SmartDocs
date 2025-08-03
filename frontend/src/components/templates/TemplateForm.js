@@ -328,7 +328,7 @@ const TemplateForm = () => {
                   
                   <Box sx={{ mb: 2 }}>
                     <Editor
-                      apiKey="your-tinymce-api-key" // Replace with your TinyMCE API key
+                      apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
                       value={values.content}
                       init={{
                         height: 500,

@@ -202,32 +202,70 @@ const aiTextPlugin = (editor) => {
     text: 'Templates',
     tooltip: 'Insert Template Content',
     icon: 'template',
-    fetch: (callback) => {
-      // These are hardcoded templates for demonstration
-      // In a real implementation, these could be fetched from an API
-      const items = [
-        {
-          type: 'menuitem',
-          text: 'Formal Letter',
-          onAction: () => insertTemplate('formal-letter')
-        },
-        {
-          type: 'menuitem',
-          text: 'Meeting Minutes',
-          onAction: () => insertTemplate('meeting-minutes')
-        },
-        {
-          type: 'menuitem',
-          text: 'Project Proposal',
-          onAction: () => insertTemplate('project-proposal')
-        },
-        {
-          type: 'menuitem',
-          text: 'Policy Document',
-          onAction: () => insertTemplate('policy')
+    fetch: async (callback) => {
+      try {
+        // Import templateService dynamically to avoid circular dependencies
+        const { getTemplates } = await import('../services/templateService');
+        
+        // Fetch templates from the backend
+        const templates = await getTemplates();
+        
+        if (templates && templates.length > 0) {
+          // Map templates to menu items
+          const items = templates.map(template => ({
+            type: 'menuitem',
+            text: template.name,
+            onAction: () => insertDynamicTemplate(template)
+          }));
+          
+          // Add option to create a new template (for admin users)
+          items.push({
+            type: 'menuitem',
+            text: '➕ Create New Template...',
+            onAction: () => {
+              // Open template creation page in a new tab/window
+              window.open('/templates/create', '_blank');
+            }
+          });
+          
+          callback(items);
+        } else {
+          // If no templates are available, show a message
+          callback([{
+            type: 'menuitem',
+            text: 'No templates available',
+            onAction: () => {
+              editor.notificationManager.open({
+                text: 'No templates available. Create a template first.',
+                type: 'info',
+                timeout: 3000
+              });
+            }
+          },
+          {
+            type: 'menuitem',
+            text: '➕ Create New Template...',
+            onAction: () => {
+              // Open template creation page in a new tab/window
+              window.open('/templates/create', '_blank');
+            }
+          }]);
         }
-      ];
-      callback(items);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        // Show error in menu
+        callback([{
+          type: 'menuitem',
+          text: 'Error loading templates',
+          onAction: () => {
+            editor.notificationManager.open({
+              text: 'Failed to load templates. Please try again later.',
+              type: 'error',
+              timeout: 3000
+            });
+          }
+        }]);
+      }
     }
   });
   
@@ -356,7 +394,7 @@ const aiTextPlugin = (editor) => {
     }
   });
 
-  // Template content for insertion
+  // Legacy template content for backward compatibility
   const templateContent = {
     'formal-letter': `<h2>Formal Letter</h2>
 <p>[Your Name]<br>[Your Address]<br>[City, State ZIP]<br>[Your Email]<br>[Your Phone]</p>
@@ -444,7 +482,60 @@ const aiTextPlugin = (editor) => {
 <p>This policy will be reviewed on [review date].</p>`
   };
   
-  // Insert template content
+  // Insert dynamic template content from backend
+  const insertDynamicTemplate = (template) => {
+    if (template && template.content) {
+      // Ask for confirmation before inserting template
+      editor.windowManager.open({
+        title: `Insert "${template.name}" Template`,
+        body: {
+          type: 'panel',
+          items: [{
+            type: 'htmlpanel',
+            html: `<p>This will insert the "${template.name}" template at the current cursor position. Any selected text will be replaced.</p>
+                  <p><strong>Category:</strong> ${template.category}</p>
+                  ${template.description ? `<p><strong>Description:</strong> ${template.description}</p>` : ''}`
+          }]
+        },
+        buttons: [
+          {
+            type: 'cancel',
+            text: 'Cancel'
+          },
+          {
+            type: 'submit',
+            text: 'Insert',
+            primary: true
+          }
+        ],
+        onSubmit: (api) => {
+          // Process template content to replace variables with actual values if needed
+          let processedContent = template.content;
+          
+          // Example of variable replacement (can be expanded based on available user data)
+          const currentDate = new Date().toLocaleDateString();
+          processedContent = processedContent.replace(/{{date}}/g, currentDate);
+          
+          // Insert the processed template content
+          editor.insertContent(processedContent);
+          api.close();
+          editor.notificationManager.open({
+            text: `Template "${template.name}" inserted successfully`,
+            type: 'success',
+            timeout: 2000
+          });
+        }
+      });
+    } else {
+      editor.notificationManager.open({
+        text: 'Invalid template data',
+        type: 'error',
+        timeout: 3000
+      });
+    }
+  };
+  
+  // Insert legacy template content (for backward compatibility)
   const insertTemplate = (templateKey) => {
     if (templateContent[templateKey]) {
       // Ask for confirmation before inserting template
