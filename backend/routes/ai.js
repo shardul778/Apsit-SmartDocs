@@ -16,6 +16,16 @@ router.use(protect);
 // Get available AI models
 router.get('/models', getModels);
 
+// AI service health check
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'AI service is running',
+    timestamp: new Date().toISOString(),
+    available: true
+  });
+});
+
 // Generate text
 router.post(
   '/generate',

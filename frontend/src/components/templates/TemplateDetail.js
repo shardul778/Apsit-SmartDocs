@@ -42,13 +42,15 @@ const TemplateDetail = () => {
   const fetchTemplate = async () => {
     setLoading(true);
     try {
+      console.log('Fetching template with ID:', id);
       const data = await templateService.getTemplateById(id);
+      console.log('Fetched template data:', data);
       setTemplate(data);
     } catch (error) {
       console.error('Error fetching template:', error);
       setAlert({
         open: true,
-        message: 'Failed to load template. Please try again later.',
+        message: `Failed to load template: ${error.message}`,
         severity: 'error'
       });
     } finally {
@@ -251,6 +253,57 @@ const TemplateDetail = () => {
       </Paper>
 
       {/* Template content preview */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Template Structure
+        </Typography>
+        <Divider sx={{ mb: 2 }} />
+        
+        <Grid container spacing={3}>
+          {/* Fields Information */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Fields ({template.fields ? template.fields.length : 0})
+            </Typography>
+            {template.fields && template.fields.length > 0 ? (
+              template.fields.map((field, index) => (
+                <Box key={index} sx={{ mb: 1, p: 1, bgcolor: theme.palette.grey[50], borderRadius: 1 }}>
+                  <Typography variant="body2">
+                    <strong>{field.label}</strong> ({field.type})
+                    {field.required && <Chip label="Required" size="small" sx={{ ml: 1 }} />}
+                  </Typography>
+                </Box>
+              ))
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No fields defined
+              </Typography>
+            )}
+          </Grid>
+          
+          {/* Header & Footer Info */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Configuration
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Header Title:</strong> {template.header?.title || 'Not set'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Header Subtitle:</strong> {template.header?.subtitle || 'Not set'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2">
+                <strong>Footer Text:</strong> {template.footer?.text || 'Not set'}
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Template content preview */}
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
           Template Content Preview
@@ -264,8 +317,34 @@ const TemplateDetail = () => {
           bgcolor: theme.palette.background.paper,
           minHeight: '300px'
         }}>
-          {/* This would typically be rendered HTML content from the template */}
-          <div dangerouslySetInnerHTML={{ __html: template.content || '<p>No content available</p>' }} />
+          {/* Display content from fields structure */}
+          {template.fields && template.fields.length > 0 ? (
+            template.fields.map((field, index) => (
+              <Box key={index} sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  {field.label} ({field.type})
+                </Typography>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: theme.palette.grey[50],
+                  borderRadius: 1,
+                  border: `1px solid ${theme.palette.divider}`
+                }}>
+                  {field.type === 'textarea' ? (
+                    <div dangerouslySetInnerHTML={{ __html: field.defaultValue || '<p>No content available</p>' }} />
+                  ) : (
+                    <Typography variant="body2">
+                      {field.defaultValue || 'No content available'}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No content available
+            </Typography>
+          )}
         </Box>
       </Paper>
 
