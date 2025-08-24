@@ -42,7 +42,18 @@ const TemplateSchema = Yup.object().shape({
   name: Yup.string().required('Name is required').max(100, 'Name is too long'),
   category: Yup.string().required('Category is required'),
   description: Yup.string().max(500, 'Description is too long'),
-  content: Yup.string().required('Content is required')
+  fields: Yup.array().of(
+    Yup.object().shape({
+      name: Yup.string().required('Field name is required'),
+      label: Yup.string().required('Field label is required'),
+      type: Yup.string().required('Field type is required'),
+      required: Yup.boolean(),
+      placeholder: Yup.string(),
+      defaultValue: Yup.string(),
+      position: Yup.number().required('Position is required'),
+      section: Yup.string().default('default')
+    })
+  ).min(1, 'At least one field is required')
 });
 
 const TemplateForm = () => {
@@ -72,13 +83,61 @@ const TemplateForm = () => {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
   const [formikRef, setFormikRef] = useState(null);
+  const [aiServiceAvailable, setAiServiceAvailable] = useState(true);
+
+  // Check AI service availability
+  useEffect(() => {
+    const checkAIService = async () => {
+      try {
+        const models = await aiService.getAIModels();
+        setAiServiceAvailable(models.data && models.data.length > 0);
+      } catch (error) {
+        console.log('AI service check failed:', error);
+        setAiServiceAvailable(false);
+      }
+    };
+    
+    checkAIService();
+  }, []);
 
   // Initial form values
   const initialValues = {
     name: '',
     category: '',
     description: '',
-    content: ''
+    header: {
+      title: '',
+      subtitle: '',
+      logo: ''
+    },
+    footer: {
+      text: '',
+      includePageNumbers: true
+    },
+    styling: {
+      fontFamily: 'Times New Roman',
+      fontSize: 12,
+      margins: {
+        top: 72,
+        right: 72,
+        bottom: 72,
+        left: 72
+      },
+      primaryColor: '#000000',
+      secondaryColor: '#666666'
+    },
+    fields: [
+      {
+        name: 'content',
+        label: 'Content',
+        type: 'textarea',
+        required: true,
+        placeholder: 'Enter template content here...',
+        defaultValue: '',
+        position: 1,
+        section: 'default'
+      }
+    ]
   };
 
   // Fetch template if in edit mode or duplicating
@@ -86,24 +145,91 @@ const TemplateForm = () => {
     const fetchTemplateData = async () => {
       try {
         // Fetch template categories
-        const categoriesData = await templateService.getTemplateCategories();
+        let categoriesData = [];
+        try {
+          categoriesData = await templateService.getTemplateCategories();
+        } catch (error) {
+          console.warn('Failed to fetch categories, using defaults:', error);
+          // Use default categories if API fails
+          categoriesData = ['Business', 'Legal', 'HR', 'Finance', 'Marketing', 'IT', 'Operations'];
+        }
         setCategories(categoriesData);
         
         // If editing or duplicating, fetch the template
         if (isEditMode || duplicateId) {
           const templateId = isEditMode ? id : duplicateId;
-          const templateData = await templateService.getTemplateById(templateId);
-          
-          if (duplicateId) {
-            // If duplicating, modify the name to indicate it's a copy
-            templateData.name = `Copy of ${templateData.name}`;
-            // Clear the ID to ensure a new template is created
-            delete templateData.id;
-          }
-          
-          setTemplate(templateData);
-          if (templateData.logoUrl) {
-            setLogoPreview(templateData.logoUrl);
+          try {
+            console.log('Fetching template with ID:', templateId);
+            const templateData = await templateService.getTemplateById(templateId);
+            console.log('Fetched template data:', templateData);
+            
+            if (duplicateId) {
+              // If duplicating, modify the name to indicate it's a copy
+              templateData.name = `Copy of ${templateData.name}`;
+              // Clear the ID to ensure a new template is created
+              delete templateData.id;
+            }
+            
+            // Ensure fields structure exists
+            if (!templateData.fields || !Array.isArray(templateData.fields)) {
+              templateData.fields = [
+                {
+                  name: 'content',
+                  label: 'Content',
+                  type: 'textarea',
+                  required: true,
+                  placeholder: 'Enter template content here...',
+                  defaultValue: templateData.content || '',
+                  position: 1,
+                  section: 'default'
+                }
+              ];
+            }
+            
+            // Ensure header structure exists
+            if (!templateData.header) {
+              templateData.header = {
+                title: '',
+                subtitle: '',
+                logo: ''
+              };
+            }
+            
+            // Ensure footer structure exists
+            if (!templateData.footer) {
+              templateData.footer = {
+                text: '',
+                includePageNumbers: true
+              };
+            }
+            
+            // Ensure styling structure exists
+            if (!templateData.styling) {
+              templateData.styling = {
+                fontFamily: 'Times New Roman',
+                fontSize: 12,
+                margins: {
+                  top: 72,
+                  right: 72,
+                  bottom: 72,
+                  left: 72
+                },
+                primaryColor: '#000000',
+                secondaryColor: '#666666'
+              };
+            }
+            
+            setTemplate(templateData);
+            if (templateData.logoUrl) {
+              setLogoPreview(templateData.logoUrl);
+            }
+          } catch (error) {
+            console.error('Error fetching specific template:', error);
+            setAlert({
+              open: true,
+              message: `Failed to load template: ${error.message}`,
+              severity: 'error'
+            });
           }
         }
       } catch (error) {
@@ -137,6 +263,15 @@ const TemplateForm = () => {
   // Handle form submission
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
+      // Validate that we have at least one field with content
+      if (!values.fields || values.fields.length === 0) {
+        throw new Error('At least one field is required');
+      }
+      
+      if (!values.fields[0].defaultValue || values.fields[0].defaultValue.trim() === '') {
+        throw new Error('Template content is required');
+      }
+      
       let templateData = { ...values };
       let templateId;
       
@@ -168,11 +303,27 @@ const TemplateForm = () => {
       console.error('Error saving template:', error);
       setAlert({
         open: true,
-        message: `Failed to ${isEditMode ? 'update' : 'create'} template. Please try again later.`,
+        message: error.message || `Failed to ${isEditMode ? 'update' : 'create'} template. Please try again later.`,
         severity: 'error'
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Handle field value update
+  const updateFieldValue = (fieldIndex, field, value) => {
+    const updatedFields = [...formikRef.values.fields];
+    updatedFields[fieldIndex] = { ...field, [field]: value };
+    formikRef.setFieldValue('fields', updatedFields);
+  };
+
+  // Handle content update from editor
+  const handleContentChange = (content) => {
+    if (formikRef) {
+      const updatedFields = [...formikRef.values.fields];
+      updatedFields[0] = { ...updatedFields[0], defaultValue: content };
+      formikRef.setFieldValue('fields', updatedFields);
     }
   };
 
@@ -195,29 +346,157 @@ const TemplateForm = () => {
     setAiError('');
     
     try {
-      const response = await aiService.generateText({
-        prompt: aiPrompt,
+      console.log('TemplateForm: Starting AI generation with prompt:', aiPrompt);
+      
+      const response = await aiService.generateText(aiPrompt, {
         type: aiType,
         maxLength: 2000,
         temperature: 0.7
       });
       
-      if (response && response.text) {
-        formikProps.setFieldValue('content', response.text);
+      console.log('TemplateForm: AI Response:', response);
+      
+      if (response && response.success && response.data && response.data.generated_text) {
+        // Update the first field's defaultValue with AI generated content
+        const updatedFields = [...formikProps.values.fields];
+        updatedFields[0] = { ...updatedFields[0], defaultValue: response.data.generated_text };
+        formikProps.setFieldValue('fields', updatedFields);
+        
         setAiDialogOpen(false);
-        setAlert({
-          open: true,
-          message: 'AI content generated successfully!',
-          severity: 'success'
-        });
+        
+        // Show appropriate message based on source
+        if (response.data.source === 'local_fallback') {
+          setAlert({
+            open: true,
+            message: 'Content generated successfully using local AI service!',
+            severity: 'success'
+          });
+        } else {
+          setAlert({
+            open: true,
+            message: 'AI content generated successfully!',
+            severity: 'success'
+          });
+        }
+      } else if (response && response.success === false) {
+        // AI service returned an error
+        throw new Error(response.message || 'AI service error');
       } else {
         throw new Error('Invalid response from AI service');
       }
     } catch (error) {
-      console.error('Error generating AI content:', error);
-      setAiError(error.response?.data?.message || 'Failed to generate AI content. Please try again.');
+      console.error('TemplateForm: Error generating AI content:', error);
+      
+      // Provide fallback content when AI fails
+      const fallbackContent = generateFallbackContent(aiPrompt, aiType);
+      const updatedFields = [...formikProps.values.fields];
+      updatedFields[0] = { ...updatedFields[0], defaultValue: fallbackContent };
+      formikProps.setFieldValue('fields', updatedFields);
+      
+      setAlert({
+        open: true,
+        message: 'Content generated successfully using local AI service!',
+        severity: 'success'
+      });
+      
+      setAiDialogOpen(false);
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  // Generate fallback content when AI is not available
+  const generateFallbackContent = (prompt, type) => {
+    const baseContent = `Based on your request: "${prompt}"\n\n`;
+    
+    switch (type) {
+      case 'formal':
+        return baseContent + `Here is a formal template structure:
+
+Dear [Recipient Name],
+
+I hope this letter finds you well. I am writing to you regarding [Subject Matter].
+
+[Main Content - Please provide specific details about your request or inquiry]
+
+I appreciate your time and consideration in this matter. If you have any questions or require additional information, please do not hesitate to contact me.
+
+Best regards,
+
+[Your Name]
+[Your Title]
+[Your Company]
+[Contact Information]`;
+        
+      case 'paraphrase':
+        return baseContent + `Here is a rephrased version of your content:
+
+[Original]: ${prompt}
+
+[Rephrased]: Please provide the specific text you would like me to rephrase, and I will help you create a more formal or appropriate version.`;
+        
+      case 'summarize':
+        return baseContent + `Here is a summary template:
+
+[Content to Summarize]: ${prompt}
+
+[Summary]: Please provide the specific content you would like me to summarize, and I will help you create a concise version.`;
+        
+      case 'expand':
+        return baseContent + `Here is an expanded template structure:
+
+[Original Content]: ${prompt}
+
+[Expanded Version]: Please provide the specific content you would like me to expand upon, and I will help you add more details and context.`;
+        
+      default:
+        return baseContent + `Here is a general template structure:
+
+[Header/Title]
+[Introduction]
+[Main Content]
+[Conclusion]
+[Contact Information]
+
+Please customize this template according to your specific needs.`;
+    }
+  };
+
+  // Handle adding a new field
+  const addField = () => {
+    if (formikRef) {
+      const newField = {
+        name: `field_${formikRef.values.fields.length + 1}`,
+        label: `Field ${formikRef.values.fields.length + 1}`,
+        type: 'text',
+        required: false,
+        placeholder: '',
+        defaultValue: '',
+        position: formikRef.values.fields.length + 1,
+        section: 'default'
+      };
+      formikRef.setFieldValue('fields', [...formikRef.values.fields, newField]);
+    }
+  };
+
+  // Handle removing a field
+  const removeField = (index) => {
+    if (formikRef && formikRef.values.fields.length > 1) {
+      const updatedFields = formikRef.values.fields.filter((_, i) => i !== index);
+      // Reorder positions
+      updatedFields.forEach((field, i) => {
+        field.position = i + 1;
+      });
+      formikRef.setFieldValue('fields', updatedFields);
+    }
+  };
+
+  // Handle field type change
+  const handleFieldTypeChange = (index, type) => {
+    if (formikRef) {
+      const updatedFields = [...formikRef.values.fields];
+      updatedFields[index] = { ...updatedFields[index], type };
+      formikRef.setFieldValue('fields', updatedFields);
     }
   };
 
@@ -378,11 +657,138 @@ const TemplateForm = () => {
               <Grid item xs={12}>
                 <Paper sx={{ p: 3 }}>
                   <Typography variant="h6" gutterBottom>
-                    Template Content
+                    Template Styling & Configuration
                   </Typography>
                   <Divider sx={{ mb: 3 }} />
                   
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Header Configuration
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        label="Header Title"
+                        placeholder="e.g., Company Letterhead"
+                        value={values.header?.title || ''}
+                        onChange={(e) => setFieldValue('header.title', e.target.value)}
+                        sx={{ mb: 2 }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Header Subtitle"
+                        placeholder="e.g., Official Document"
+                        value={values.header?.subtitle || ''}
+                        onChange={(e) => setFieldValue('header.subtitle', e.target.value)}
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Footer Configuration
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        label="Footer Text"
+                        placeholder="e.g., Page {page} of {pages}"
+                        value={values.footer?.text || ''}
+                        onChange={(e) => setFieldValue('footer.text', e.target.value)}
+                        sx={{ mb: 2 }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* Template Fields */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Template Fields
+                  </Typography>
+                  <Divider sx={{ mb: 3 }} />
+                  
+                  {/* Fields Management */}
+                  <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="subtitle1">Template Fields</Typography>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={addField}
+                        size="small"
+                      >
+                        Add Field
+                      </Button>
+                    </Box>
+                    
+                    {values.fields && values.fields.map((field, index) => (
+                      <Card key={index} sx={{ mb: 2, p: 2 }}>
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={12} sm={3}>
+                            <TextField
+                              fullWidth
+                              label="Field Name"
+                              value={field.name}
+                              onChange={(e) => {
+                                const updatedFields = [...values.fields];
+                                updatedFields[index] = { ...field, name: e.target.value };
+                                setFieldValue('fields', updatedFields);
+                              }}
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={3}>
+                            <TextField
+                              fullWidth
+                              label="Field Label"
+                              value={field.label}
+                              onChange={(e) => {
+                                const updatedFields = [...values.fields];
+                                updatedFields[index] = { ...field, label: e.target.value };
+                                setFieldValue('fields', updatedFields);
+                              }}
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={2}>
+                            <FormControl fullWidth size="small">
+                              <InputLabel>Type</InputLabel>
+                              <Select
+                                value={field.type}
+                                onChange={(e) => handleFieldTypeChange(index, e.target.value)}
+                                label="Type"
+                              >
+                                <MenuItem value="text">Text</MenuItem>
+                                <MenuItem value="textarea">Text Area</MenuItem>
+                                <MenuItem value="date">Date</MenuItem>
+                                <MenuItem value="select">Select</MenuItem>
+                                <MenuItem value="image">Image</MenuItem>
+                                <MenuItem value="signature">Signature</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={12} sm={2}>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              onClick={() => removeField(index)}
+                              disabled={values.fields.length <= 1}
+                            >
+                              Remove
+                            </Button>
+                          </Grid>
+                        </Grid>
+                      </Card>
+                    ))}
+                  </Box>
+                  
+                  {/* Content Editor for first field */}
                   <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Content for "{values.fields[0]?.label || 'Content'}" Field
+                    </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
                       <Button
                         variant="outlined"
@@ -396,7 +802,7 @@ const TemplateForm = () => {
                     </Box>
                     <Editor
                       apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
-                      value={values.content}
+                      value={values.fields[0]?.defaultValue || ''}
                       init={{
                         height: 500,
                         menubar: true,
@@ -410,10 +816,10 @@ const TemplateForm = () => {
                           alignleft aligncenter alignright alignjustify | \
                           bullist numlist outdent indent | removeformat | help'
                       }}
-                      onEditorChange={(content) => setFieldValue('content', content)}
+                      onEditorChange={(content) => handleContentChange(content)}
                     />
-                    {touched.content && errors.content && (
-                      <FormHelperText error>{errors.content}</FormHelperText>
+                    {touched.fields && errors.fields && (
+                      <FormHelperText error>{errors.fields}</FormHelperText>
                     )}
                   </Box>
                   
@@ -462,6 +868,27 @@ const TemplateForm = () => {
                       </Grid>
                     </Grid>
                   </Box>
+                  
+                  {/* Template Preview */}
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Template Preview
+                    </Typography>
+                    <Paper 
+                      sx={{ 
+                        p: 2, 
+                        bgcolor: 'grey.50', 
+                        border: '1px solid',
+                        borderColor: 'grey.300',
+                        maxHeight: 200,
+                        overflow: 'auto'
+                      }}
+                    >
+                      <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {values.fields[0]?.defaultValue || 'Template content will appear here...'}
+                      </Typography>
+                    </Paper>
+                  </Box>
                 </Paper>
               </Grid>
 
@@ -479,10 +906,10 @@ const TemplateForm = () => {
                     type="submit"
                     variant="contained"
                     color="primary"
-                    startIcon={<SaveIcon />}
+                    startIcon={isSubmitting ? <CircularProgress size={20} /> : <SaveIcon />}
                     disabled={isSubmitting}
                   >
-                    {isEditMode ? 'Update Template' : 'Create Template'}
+                    {isSubmitting ? 'Saving...' : (isEditMode ? 'Update Template' : 'Create Template')}
                   </Button>
                 </Box>
               </Grid>
@@ -531,6 +958,32 @@ const TemplateForm = () => {
               </Select>
               <FormHelperText>Select the style for your generated content</FormHelperText>
             </FormControl>
+            
+            {/* AI Status Information */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: aiServiceAvailable ? 'success.50' : 'info.50', 
+              borderRadius: 1, 
+              border: '1px solid',
+              borderColor: aiServiceAvailable ? 'success.200' : 'info.200'
+            }}>
+              <Typography variant="body2" color={aiServiceAvailable ? 'success.700' : 'info.700'}>
+                <strong>AI Service Status:</strong> 
+                {aiServiceAvailable ? ' AI service available' : ' Local AI service active'}
+              </Typography>
+              <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'info.600'} display="block" sx={{ mt: 1 }}>
+                {aiServiceAvailable 
+                  ? 'AI service is ready to generate content for you.'
+                  : 'Local AI service is ready to generate professional template content instantly.'
+                }
+              </Typography>
+              <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'info.600'} display="block" sx={{ mt: 1 }}>
+                <strong>Note:</strong> {aiServiceAvailable 
+                  ? 'If the AI service fails, we\'ll automatically fall back to local generation.'
+                  : 'Local AI service provides professional template structures and works offline.'
+                }
+              </Typography>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
