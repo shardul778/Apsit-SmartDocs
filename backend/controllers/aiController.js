@@ -8,6 +8,14 @@ const axios = require('axios');
  */
 exports.generateText = async (req, res, next) => {
   try {
+    // Verify user is authenticated
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to use AI features'
+      });
+    }
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -77,6 +85,39 @@ exports.generateText = async (req, res, next) => {
           generated_text: generatedText,
         },
       });
+    } else if (process.env.GEMINI_API_KEY) {
+      // Use Google's Gemini API
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          contents: [
+            {
+              parts: [
+                { text: formattedPrompt }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: temperature,
+            maxOutputTokens: maxLength,
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // Extract generated text from Gemini response
+      const generatedText = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          generated_text: generatedText,
+        },
+      });
     } else if (process.env.OLLAMA_API_URL) {
       // Use local Ollama model
       const response = await axios.post(
@@ -108,14 +149,19 @@ exports.generateText = async (req, res, next) => {
       // No AI model configured
       return res.status(500).json({
         success: false,
-        message: 'AI model not configured. Please set up HUGGINGFACE_API_KEY or OLLAMA_API_URL in environment variables.',
+        message: 'AI model not configured. Please set up HUGGINGFACE_API_KEY, GEMINI_API_KEY, or OLLAMA_API_URL in environment variables.',
       });
     }
   } catch (error) {
     console.error('AI generation error:', error.response?.data || error.message);
     
     // Handle specific API errors
-    if (error.response) {
+    if (error.response?.status === 401) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication error: Please log in again to use AI features'
+      });
+    } else if (error.response) {
       return res.status(error.response.status).json({
         success: false,
         message: 'Error generating text',
@@ -143,6 +189,15 @@ exports.getModels = async (req, res, next) => {
         name: process.env.HUGGINGFACE_MODEL || 'mistralai/Mistral-7B-Instruct-v0.1',
         type: 'api',
         provider: 'Hugging Face',
+      });
+    }
+    
+    if (process.env.GEMINI_API_KEY) {
+      models.push({
+        id: 'gemini',
+        name: 'gemini-pro',
+        type: 'api',
+        provider: 'Google Gemini',
       });
     }
     

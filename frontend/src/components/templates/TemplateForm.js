@@ -17,14 +17,21 @@ import {
   Select,
   TextField,
   Typography,
-  useTheme
+  useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress
 } from '@mui/material';
 import {
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
-  Upload as UploadIcon
+  Upload as UploadIcon,
+  AutoAwesome as AutoAwesomeIcon
 } from '@mui/icons-material';
 import { templateService } from '../../services';
+import { aiService } from '../../services';
 import { PageHeader, LoadingSpinner, AlertMessage } from '../common';
 
 // Rich text editor (using a placeholder, you can replace with your preferred editor)
@@ -57,6 +64,14 @@ const TemplateForm = () => {
     message: '',
     severity: 'info'
   });
+  
+  // AI Dialog state
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiType, setAiType] = useState('formal');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [formikRef, setFormikRef] = useState(null);
 
   // Initial form values
   const initialValues = {
@@ -168,6 +183,43 @@ const TemplateForm = () => {
       setFieldValue('category', newCategory);
     }
   };
+  
+  // Handle AI content generation
+  const handleAiGenerate = async (formikProps) => {
+    if (!aiPrompt.trim()) {
+      setAiError('Please enter a prompt for the AI');
+      return;
+    }
+    
+    setAiGenerating(true);
+    setAiError('');
+    
+    try {
+      const response = await aiService.generateText({
+        prompt: aiPrompt,
+        type: aiType,
+        maxLength: 2000,
+        temperature: 0.7
+      });
+      
+      if (response && response.text) {
+        formikProps.setFieldValue('content', response.text);
+        setAiDialogOpen(false);
+        setAlert({
+          open: true,
+          message: 'AI content generated successfully!',
+          severity: 'success'
+        });
+      } else {
+        throw new Error('Invalid response from AI service');
+      }
+    } catch (error) {
+      console.error('Error generating AI content:', error);
+      setAiError(error.response?.data?.message || 'Failed to generate AI content. Please try again.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner message="Loading template data..." />;
@@ -194,10 +246,14 @@ const TemplateForm = () => {
       <Formik
         initialValues={template || initialValues}
         validationSchema={TemplateSchema}
-        enableReinitialize
         onSubmit={handleSubmit}
+        enableReinitialize
       >
-        {({ isSubmitting, values, errors, touched, handleChange, setFieldValue }) => (
+        {(formikProps) => {
+          // Store formik reference for AI dialog
+          const { isSubmitting, values, errors, touched, handleChange, setFieldValue } = formikProps;
+          if (!formikRef) setFormikRef(formikProps);
+          return (
           <Form>
             <Grid container spacing={3}>
               {/* Template details */}
@@ -327,6 +383,17 @@ const TemplateForm = () => {
                   <Divider sx={{ mb: 3 }} />
                   
                   <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<AutoAwesomeIcon />}
+                        onClick={() => setAiDialogOpen(true)}
+                        sx={{ mb: 1 }}
+                      >
+                        Generate with AI
+                      </Button>
+                    </Box>
                     <Editor
                       apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
                       value={values.content}
@@ -421,7 +488,7 @@ const TemplateForm = () => {
               </Grid>
             </Grid>
           </Form>
-        )}
+        )}}
       </Formik>
 
       {/* Alert message */}
@@ -431,6 +498,60 @@ const TemplateForm = () => {
         severity={alert.severity}
         onClose={() => setAlert({ ...alert, open: false })}
       />
+      
+      {/* AI Content Generation Dialog */}
+      <Dialog open={aiDialogOpen} onClose={() => setAiDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Generate Template Content with AI</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Describe what kind of template you want to create"
+              multiline
+              rows={4}
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="E.g., Create a formal business letter template for client communications"
+              error={Boolean(aiError)}
+              helperText={aiError}
+              sx={{ mb: 2 }}
+            />
+            
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>AI Style</InputLabel>
+              <Select
+                value={aiType}
+                onChange={(e) => setAiType(e.target.value)}
+                label="AI Style"
+              >
+                <MenuItem value="formal">Formal</MenuItem>
+                <MenuItem value="paraphrase">Creative</MenuItem>
+                <MenuItem value="summarize">Concise</MenuItem>
+                <MenuItem value="expand">Detailed</MenuItem>
+              </Select>
+              <FormHelperText>Select the style for your generated content</FormHelperText>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAiDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={() => {
+              if (formikRef) {
+                handleAiGenerate(formikRef);
+              } else {
+                setAiError('Could not access form context. Please try again.');
+              }
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={aiGenerating}
+            startIcon={aiGenerating ? <CircularProgress size={20} /> : <AutoAwesomeIcon />}
+          >
+            {aiGenerating ? 'Generating...' : 'Generate Content'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

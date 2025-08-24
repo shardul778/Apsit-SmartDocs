@@ -4,8 +4,18 @@
  */
 
 import { generateFormalText, paraphraseText, summarizeText, expandText } from '../services/aiService';
+import axios from '../services/axiosConfig';
 
 const aiTextPlugin = (editor) => {
+  // Function to check and refresh token
+  const refreshAuthToken = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      return true;
+    }
+    return false;
+  };
   // Citation function
   const insertCitation = () => {
     editor.windowManager.open({
@@ -580,6 +590,18 @@ const aiTextPlugin = (editor) => {
 
   // Handle AI text generation actions
   const handleAiAction = async (type) => {
+    // Check authentication before proceeding
+    if (!refreshAuthToken()) {
+      editor.notificationManager.open({
+        text: 'Please log in to use AI features',
+        type: 'error',
+        timeout: 3000
+      });
+      // Redirect to login page
+      window.location.href = '/login';
+      return;
+    }
+
     // Get selected text
     const selectedText = editor.selection.getContent({ format: 'text' });
     

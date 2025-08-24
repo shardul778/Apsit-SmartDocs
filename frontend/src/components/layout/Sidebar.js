@@ -8,8 +8,9 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
   Typography,
+  IconButton,
+  Divider
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -19,8 +20,11 @@ import {
   People as UserIcon,
   Person as ProfileIcon,
   Settings as SettingsIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const drawerWidth = 240;
 
@@ -28,6 +32,7 @@ const Sidebar = ({ open, onClose, variant = 'permanent' }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   // Navigation items based on user role
   const mainNavItems = [
@@ -122,6 +127,11 @@ const Sidebar = ({ open, onClose, variant = 'permanent' }) => {
           </ListItem>
         ))}
       </List>
+      <Box sx={{ mr: 2 }}>
+            <IconButton onClick={toggleDarkMode} color="inherit">
+              {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Box>
     </>
   );
 
@@ -156,6 +166,7 @@ const Sidebar = ({ open, onClose, variant = 'permanent' }) => {
         {drawer}
       </Drawer>
     </Box>
+    
   );
 };
 
