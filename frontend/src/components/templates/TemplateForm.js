@@ -90,7 +90,18 @@ const TemplateForm = () => {
     const checkAIService = async () => {
       try {
         const models = await aiService.getAIModels();
-        setAiServiceAvailable(models.data && models.data.length > 0);
+        console.log('TemplateForm: Available AI models:', models);
+        
+        // Check if we have real AI models (not just local fallback)
+        const hasRealModels = models.data && models.data.some(model => 
+          model.provider && 
+          (model.provider.includes('Google Gemini') || 
+           model.provider.includes('Hugging Face') || 
+           model.provider.includes('Ollama'))
+        );
+        
+        setAiServiceAvailable(hasRealModels);
+        console.log('TemplateForm: AI service available:', hasRealModels);
       } catch (error) {
         console.log('AI service check failed:', error);
         setAiServiceAvailable(false);
@@ -106,12 +117,10 @@ const TemplateForm = () => {
     category: '',
     description: '',
     header: {
-      title: '',
-      subtitle: '',
-      logo: ''
+      logo: '/DS_header.png' // Fixed header image path only
     },
     footer: {
-      text: '',
+      text: '{pagenumber}', // Fixed footer with page number
       includePageNumbers: true
     },
     styling: {
@@ -186,22 +195,26 @@ const TemplateForm = () => {
               ];
             }
             
-            // Ensure header structure exists
-            if (!templateData.header) {
-              templateData.header = {
-                title: '',
-                subtitle: '',
-                logo: ''
-              };
-            }
-            
-            // Ensure footer structure exists
-            if (!templateData.footer) {
-              templateData.footer = {
-                text: '',
-                includePageNumbers: true
-              };
-            }
+                         // Ensure header structure exists with fixed values
+             if (!templateData.header) {
+               templateData.header = {
+                 logo: '/DS_header.png'
+               };
+             } else {
+               // Ensure logo is always set to fixed image
+               templateData.header.logo = '/DS_header.png';
+             }
+             
+             // Ensure footer structure exists with fixed values
+             if (!templateData.footer) {
+               templateData.footer = {
+                 text: '{pagenumber}',
+                 includePageNumbers: true
+               };
+             } else {
+               // Ensure footer text is always set to fixed format
+               templateData.footer.text = '{pagenumber}';
+             }
             
             // Ensure styling structure exists
             if (!templateData.styling) {
@@ -357,9 +370,38 @@ const TemplateForm = () => {
       console.log('TemplateForm: AI Response:', response);
       
       if (response && response.success && response.data && response.data.generated_text) {
-        // Update the first field's defaultValue with AI generated content
+        // Process the generated text to convert markdown to HTML and preserve formatting
+        let formattedText = response.data.generated_text;
+        
+        // Convert markdown-style formatting to HTML
+        formattedText = formattedText
+          // Convert markdown bold to HTML strong
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          // Convert markdown italic to HTML em
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          // Convert markdown headers to HTML headers
+          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+          // Convert markdown lists
+          .replace(/^\* (.*$)/gim, '<li>$1</li>')
+          .replace(/^- (.*$)/gim, '<li>$1</li>')
+          // Convert markdown numbered lists
+          .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+          // Ensure proper line breaks and spacing are preserved
+          .replace(/\n\n/g, '</p><p>') // Convert double line breaks to paragraph breaks
+          .replace(/\n/g, '<br>') // Convert single line breaks to HTML line breaks
+          .replace(/^/, '<p>') // Start with opening paragraph tag
+          .replace(/$/, '</p>'); // End with closing paragraph tag
+        
+        // Wrap lists properly
+        formattedText = formattedText
+          .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+          .replace(/<\/ul>\s*<ul>/g, ''); // Remove duplicate ul tags
+        
+        // Update the first field's defaultValue with formatted AI generated content
         const updatedFields = [...formikProps.values.fields];
-        updatedFields[0] = { ...updatedFields[0], defaultValue: response.data.generated_text };
+        updatedFields[0] = { ...updatedFields[0], defaultValue: formattedText };
         formikProps.setFieldValue('fields', updatedFields);
         
         setAiDialogOpen(false);
@@ -374,7 +416,7 @@ const TemplateForm = () => {
         } else {
           setAlert({
             open: true,
-            message: 'AI content generated successfully!',
+            message: 'Content generated successfully using Google Gemini AI!',
             severity: 'success'
           });
         }
@@ -387,80 +429,20 @@ const TemplateForm = () => {
     } catch (error) {
       console.error('TemplateForm: Error generating AI content:', error);
       
-      // Provide fallback content when AI fails
-      const fallbackContent = generateFallbackContent(aiPrompt, aiType);
-      const updatedFields = [...formikProps.values.fields];
-      updatedFields[0] = { ...updatedFields[0], defaultValue: fallbackContent };
-      formikProps.setFieldValue('fields', updatedFields);
-      
+      // Show error message instead of using fallback content
       setAlert({
         open: true,
-        message: 'Content generated successfully using local AI service!',
-        severity: 'success'
+        message: `AI generation failed: ${error.message}. Please try again or contact support.`,
+        severity: 'error'
       });
       
-      setAiDialogOpen(false);
+      setAiError(`Generation failed: ${error.message}`);
     } finally {
       setAiGenerating(false);
     }
   };
 
-  // Generate fallback content when AI is not available
-  const generateFallbackContent = (prompt, type) => {
-    const baseContent = `Based on your request: "${prompt}"\n\n`;
-    
-    switch (type) {
-      case 'formal':
-        return baseContent + `Here is a formal template structure:
 
-Dear [Recipient Name],
-
-I hope this letter finds you well. I am writing to you regarding [Subject Matter].
-
-[Main Content - Please provide specific details about your request or inquiry]
-
-I appreciate your time and consideration in this matter. If you have any questions or require additional information, please do not hesitate to contact me.
-
-Best regards,
-
-[Your Name]
-[Your Title]
-[Your Company]
-[Contact Information]`;
-        
-      case 'paraphrase':
-        return baseContent + `Here is a rephrased version of your content:
-
-[Original]: ${prompt}
-
-[Rephrased]: Please provide the specific text you would like me to rephrase, and I will help you create a more formal or appropriate version.`;
-        
-      case 'summarize':
-        return baseContent + `Here is a summary template:
-
-[Content to Summarize]: ${prompt}
-
-[Summary]: Please provide the specific content you would like me to summarize, and I will help you create a concise version.`;
-        
-      case 'expand':
-        return baseContent + `Here is an expanded template structure:
-
-[Original Content]: ${prompt}
-
-[Expanded Version]: Please provide the specific content you would like me to expand upon, and I will help you add more details and context.`;
-        
-      default:
-        return baseContent + `Here is a general template structure:
-
-[Header/Title]
-[Introduction]
-[Main Content]
-[Conclusion]
-[Contact Information]
-
-Please customize this template according to your specific needs.`;
-    }
-  };
 
   // Handle adding a new field
   const addField = () => {
@@ -662,40 +644,48 @@ Please customize this template according to your specific needs.`;
                   <Divider sx={{ mb: 3 }} />
                   
                   <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Header Configuration
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        label="Header Title"
-                        placeholder="e.g., Company Letterhead"
-                        value={values.header?.title || ''}
-                        onChange={(e) => setFieldValue('header.title', e.target.value)}
-                        sx={{ mb: 2 }}
-                      />
-                      <TextField
-                        fullWidth
-                        label="Header Subtitle"
-                        placeholder="e.g., Official Document"
-                        value={values.header?.subtitle || ''}
-                        onChange={(e) => setFieldValue('header.subtitle', e.target.value)}
-                      />
-                    </Grid>
+                                                               <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Header Configuration (Fixed)
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="body2" sx={{ mr: 2 }}>
+                            Header Image:
+                          </Typography>
+                                                     <Box 
+                             component="img" 
+                             src="/DS_header.png" 
+                             alt="APSIT Header" 
+                             sx={{ 
+                               width: 200, 
+                               height: 60, 
+                               objectFit: 'contain',
+                               border: '1px solid #ddd',
+                               borderRadius: 1
+                             }} 
+                           />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Fixed header image: DS_header.png (no text content)
+                        </Typography>
+                      </Grid>
                     
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Footer Configuration
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        label="Footer Text"
-                        placeholder="e.g., Page {page} of {pages}"
-                        value={values.footer?.text || ''}
-                        onChange={(e) => setFieldValue('footer.text', e.target.value)}
-                        sx={{ mb: 2 }}
-                      />
-                    </Grid>
+                                         <Grid item xs={12} md={6}>
+                       <Typography variant="subtitle2" gutterBottom>
+                         Footer Configuration (Fixed)
+                       </Typography>
+                       <TextField
+                         fullWidth
+                         label="Footer Text"
+                         value={values.footer?.text || '{pagenumber}'}
+                         onChange={(e) => setFieldValue('footer.text', e.target.value)}
+                         sx={{ mb: 2 }}
+                         helperText="Fixed format: {pagenumber} will be replaced with actual page numbers"
+                       />
+                       <Typography variant="caption" color="text.secondary">
+                         Footer will automatically show page numbers in format: 1, 2, 3, etc.
+                       </Typography>
+                     </Grid>
                   </Grid>
                 </Paper>
               </Grid>
@@ -869,26 +859,92 @@ Please customize this template according to your specific needs.`;
                     </Grid>
                   </Box>
                   
-                  {/* Template Preview */}
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Template Preview
-                    </Typography>
-                    <Paper 
-                      sx={{ 
-                        p: 2, 
-                        bgcolor: 'grey.50', 
-                        border: '1px solid',
-                        borderColor: 'grey.300',
-                        maxHeight: 200,
-                        overflow: 'auto'
-                      }}
-                    >
-                      <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {values.fields[0]?.defaultValue || 'Template content will appear here...'}
+                                                         {/* Template Preview */}
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ 
+                        fontWeight: 'bold',
+                        color: '#1a1a1a',
+                        mb: 2
+                      }}>
+                        📄 Template Preview
                       </Typography>
-                    </Paper>
-                  </Box>
+                      <Paper 
+                        sx={{ 
+                          p: 3, 
+                          bgcolor: 'white', 
+                          color: 'black',
+                          border: '2px solid',
+                          borderColor: '#e0e0e0',
+                          maxHeight: 400,
+                          overflow: 'auto',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                          borderRadius: 2
+                        }}
+                      >
+                                               {/* Header Preview */}
+                        <Box sx={{ 
+                          mb: 2, 
+                          textAlign: 'center', 
+                          borderBottom: '1px solid #ddd', 
+                          pb: 2,
+                          bgcolor: 'white',
+                          borderRadius: 1,
+                          p: 2
+                        }}>
+                                                     <Box 
+                             component="img" 
+                             src="/DS_header.png" 
+                             alt="APSIT Header" 
+                             sx={{
+                              width: 1000,
+                               filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))'
+                             }} 
+                           />
+                        </Box>
+                       
+                                               {/* Content Preview */}
+                        <Box sx={{ mb: 2, minHeight: 100, p: 2, bgcolor: '#fafafa', borderRadius: 1 }}>
+                          {values.fields[0]?.defaultValue ? (
+                            <Typography 
+                              variant="body2" 
+                              component="div" 
+                              dangerouslySetInnerHTML={{
+                                __html: values.fields[0]?.defaultValue
+                              }}
+                              sx={{ 
+                                '& p': { margin: '0.5em 0', lineHeight: 1.6 },
+                                '& br': { display: 'block', margin: '0.2em 0' },
+                                '& strong': { fontWeight: 'bold' },
+                                '& em': { fontStyle: 'italic' },
+                                '& ul, & ol': { margin: '0.5em 0', paddingLeft: '1.5em' },
+                                '& li': { margin: '0.2em 0' }
+                              }}
+                            />
+                          ) : (
+                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                              Template content will appear here... Use the editor above or AI generation to add content.
+                            </Typography>
+                          )}
+                        </Box>
+                       
+                                               {/* Footer Preview */}
+                        <Box sx={{ 
+                          textAlign: 'center', 
+                          borderTop: '1px solid #ddd', 
+                          pt: 2,
+                          bgcolor: 'white',
+                          borderRadius: 1,
+                          p: 2
+                        }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                            Page <strong>1</strong> of <strong>1</strong>
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                            Footer format: {values.footer?.text || '{pagenumber}'} → Will show as: 1, 2, 3, etc.
+                          </Typography>
+                        </Box>
+                     </Paper>
+                   </Box>
                 </Paper>
               </Grid>
 
@@ -959,31 +1015,31 @@ Please customize this template according to your specific needs.`;
               <FormHelperText>Select the style for your generated content</FormHelperText>
             </FormControl>
             
-            {/* AI Status Information */}
-            <Box sx={{ 
-              p: 2, 
-              bgcolor: aiServiceAvailable ? 'success.50' : 'info.50', 
-              borderRadius: 1, 
-              border: '1px solid',
-              borderColor: aiServiceAvailable ? 'success.200' : 'info.200'
-            }}>
-              <Typography variant="body2" color={aiServiceAvailable ? 'success.700' : 'info.700'}>
-                <strong>AI Service Status:</strong> 
-                {aiServiceAvailable ? ' AI service available' : ' Local AI service active'}
-              </Typography>
-              <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'info.600'} display="block" sx={{ mt: 1 }}>
-                {aiServiceAvailable 
-                  ? 'AI service is ready to generate content for you.'
-                  : 'Local AI service is ready to generate professional template content instantly.'
-                }
-              </Typography>
-              <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'info.600'} display="block" sx={{ mt: 1 }}>
-                <strong>Note:</strong> {aiServiceAvailable 
-                  ? 'If the AI service fails, we\'ll automatically fall back to local generation.'
-                  : 'Local AI service provides professional template structures and works offline.'
-                }
-              </Typography>
-            </Box>
+                         {/* AI Status Information */}
+             <Box sx={{ 
+               p: 2, 
+               bgcolor: aiServiceAvailable ? 'success.50' : 'warning.50', 
+               borderRadius: 1, 
+               border: '1px solid',
+               borderColor: aiServiceAvailable ? 'success.200' : 'warning.200'
+             }}>
+               <Typography variant="body2" color={aiServiceAvailable ? 'success.700' : 'warning.700'}>
+                 <strong>AI Service Status:</strong> 
+                 {aiServiceAvailable ? ' Google Gemini AI available' : ' AI service unavailable'}
+               </Typography>
+               <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'warning.600'} display="block" sx={{ mt: 1 }}>
+                 {aiServiceAvailable 
+                   ? 'Google Gemini AI is ready to generate high-quality content for your templates.'
+                   : 'AI service is currently unavailable. Please try again later or contact support.'
+                 }
+               </Typography>
+               <Typography variant="caption" color={aiServiceAvailable ? 'success.600' : 'warning.600'} display="block" sx={{ mt: 1 }}>
+                 <strong>Note:</strong> {aiServiceAvailable 
+                   ? 'Using Google Gemini AI for advanced content generation. No fallback content will be provided.'
+                   : 'Please ensure the backend server is running and Gemini API is properly configured.'
+                 }
+               </Typography>
+             </Box>
           </Box>
         </DialogContent>
         <DialogActions>

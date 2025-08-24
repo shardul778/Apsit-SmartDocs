@@ -130,7 +130,6 @@ const aiTextPlugin = (editor) => {
     headings.forEach((heading, index) => {
       const headingText = heading.textContent;
       const headingLevel = parseInt(heading.tagName.substring(1));
-      const indent = '&nbsp;'.repeat((headingLevel - 1) * 4);
       
       // Add an ID to the heading if it doesn't have one
       if (!heading.id) {
@@ -387,7 +386,6 @@ const aiTextPlugin = (editor) => {
       headings.forEach((heading, index) => {
         const level = parseInt(heading.tagName.substring(1));
         const text = heading.textContent;
-        const indent = '&nbsp;'.repeat((level - 1) * 4);
         
         // Add ID to the heading if it doesn't have one
         if (!heading.id) {
@@ -404,93 +402,7 @@ const aiTextPlugin = (editor) => {
     }
   });
 
-  // Legacy template content for backward compatibility
-  const templateContent = {
-    'formal-letter': `<h2>Formal Letter</h2>
-<p>[Your Name]<br>[Your Address]<br>[City, State ZIP]<br>[Your Email]<br>[Your Phone]</p>
-<p>[Date]</p>
-<p>[Recipient Name]<br>[Recipient Title]<br>[Company Name]<br>[Company Address]<br>[City, State ZIP]</p>
-<p>Dear [Recipient Name],</p>
-<p>I am writing to [purpose of the letter]. I would like to [specific request or information].</p>
-<p>[Additional details or context about your request]</p>
-<p>Thank you for your time and consideration. I look forward to your response.</p>
-<p>Sincerely,</p>
-<p>[Your Name]<br>[Your Title]</p>`,
-    
-    'meeting-minutes': `<h2>Meeting Minutes</h2>
-<p><strong>Date:</strong> [Meeting Date]</p>
-<p><strong>Time:</strong> [Start Time] - [End Time]</p>
-<p><strong>Location:</strong> [Meeting Location]</p>
-<p><strong>Attendees:</strong></p>
-<ul>
-<li>[Attendee 1]</li>
-<li>[Attendee 2]</li>
-<li>[Attendee 3]</li>
-</ul>
-<p><strong>Agenda:</strong></p>
-<ol>
-<li>[Agenda Item 1]</li>
-<li>[Agenda Item 2]</li>
-<li>[Agenda Item 3]</li>
-</ol>
-<p><strong>Discussion:</strong></p>
-<p>[Summary of discussion points]</p>
-<p><strong>Action Items:</strong></p>
-<ul>
-<li>[Action Item 1] - Assigned to: [Person], Due: [Date]</li>
-<li>[Action Item 2] - Assigned to: [Person], Due: [Date]</li>
-</ul>
-<p><strong>Next Meeting:</strong> [Date and Time]</p>`,
-    
-    'project-proposal': `<h2>Project Proposal</h2>
-<h3>Executive Summary</h3>
-<p>[Brief overview of the project and its objectives]</p>
-<h3>Project Background</h3>
-<p>[Context and rationale for the project]</p>
-<h3>Objectives</h3>
-<ul>
-<li>[Objective 1]</li>
-<li>[Objective 2]</li>
-<li>[Objective 3]</li>
-</ul>
-<h3>Scope</h3>
-<p>[Define what is included and excluded from the project]</p>
-<h3>Timeline</h3>
-<p>[Project schedule with key milestones]</p>
-<h3>Budget</h3>
-<p>[Cost breakdown and financial requirements]</p>
-<h3>Team</h3>
-<p>[Key personnel and their roles]</p>
-<h3>Expected Outcomes</h3>
-<p>[Anticipated results and benefits]</p>`,
-    
-    'policy': `<h2>Policy Document</h2>
-<h3>Purpose</h3>
-<p>[State the purpose of this policy]</p>
-<h3>Scope</h3>
-<p>[Define who this policy applies to]</p>
-<h3>Policy Statement</h3>
-<p>[Main policy declaration]</p>
-<h3>Definitions</h3>
-<ul>
-<li><strong>[Term 1]:</strong> [Definition]</li>
-<li><strong>[Term 2]:</strong> [Definition]</li>
-</ul>
-<h3>Responsibilities</h3>
-<p>[Outline who is responsible for implementing and enforcing this policy]</p>
-<h3>Procedures</h3>
-<ol>
-<li>[Procedure step 1]</li>
-<li>[Procedure step 2]</li>
-<li>[Procedure step 3]</li>
-</ol>
-<h3>Compliance</h3>
-<p>[Consequences of non-compliance]</p>
-<h3>Related Documents</h3>
-<p>[List related policies, procedures, or forms]</p>
-<h3>Review</h3>
-<p>This policy will be reviewed on [review date].</p>`
-  };
+
   
   // Insert dynamic template content from backend
   const insertDynamicTemplate = (template) => {
@@ -545,48 +457,7 @@ const aiTextPlugin = (editor) => {
     }
   };
   
-  // Insert legacy template content (for backward compatibility)
-  const insertTemplate = (templateKey) => {
-    if (templateContent[templateKey]) {
-      // Ask for confirmation before inserting template
-      editor.windowManager.open({
-        title: 'Insert Template',
-        body: {
-          type: 'panel',
-          items: [{
-            type: 'htmlpanel',
-            html: '<p>This will insert a template at the current cursor position. Any selected text will be replaced. Do you want to continue?</p>'
-          }]
-        },
-        buttons: [
-          {
-            type: 'cancel',
-            text: 'Cancel'
-          },
-          {
-            type: 'submit',
-            text: 'Insert',
-            primary: true
-          }
-        ],
-        onSubmit: (api) => {
-          editor.insertContent(templateContent[templateKey]);
-          api.close();
-          editor.notificationManager.open({
-            text: 'Template inserted successfully',
-            type: 'success',
-            timeout: 2000
-          });
-        }
-      });
-    } else {
-      editor.notificationManager.open({
-        text: `Template "${templateKey}" not found`,
-        type: 'error',
-        timeout: 3000
-      });
-    }
-  };
+
 
   // Handle AI text generation actions
   const handleAiAction = async (type) => {

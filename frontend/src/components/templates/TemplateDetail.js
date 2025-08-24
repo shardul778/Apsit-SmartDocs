@@ -267,7 +267,7 @@ const TemplateDetail = () => {
             </Typography>
             {template.fields && template.fields.length > 0 ? (
               template.fields.map((field, index) => (
-                <Box key={index} sx={{ mb: 1, p: 1, bgcolor: theme.palette.grey[50], borderRadius: 1 }}>
+                <Box key={index} sx={{ mb: 1, p: 1, color: 'black', bgcolor: theme.palette.grey[50], borderRadius: 1 }}>
                   <Typography variant="body2">
                     <strong>{field.label}</strong> ({field.type})
                     {field.required && <Chip label="Required" size="small" sx={{ ml: 1 }} />}
@@ -283,7 +283,7 @@ const TemplateDetail = () => {
           
           {/* Header & Footer Info */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Typography variant="subtitle2" color="text.secondar" gutterBottom>
               Configuration
             </Typography>
             <Box sx={{ mb: 2 }}>
@@ -314,6 +314,7 @@ const TemplateDetail = () => {
           p: 2, 
           border: `1px solid ${theme.palette.divider}`,
           borderRadius: 1,
+          color: 'black',
           bgcolor: theme.palette.background.paper,
           minHeight: '300px'
         }}>
