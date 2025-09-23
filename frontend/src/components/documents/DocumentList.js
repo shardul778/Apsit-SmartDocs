@@ -32,11 +32,14 @@ import {
   FileDownload as FileDownloadIcon,
   Visibility as VisibilityIcon,
   Search as SearchIcon,
-  FilterList as FilterListIcon
+  FilterList as FilterListIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { documentService } from '../../services';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } from '../common';
+import { DialogContentText, TextField as MuiTextField } from '@mui/material';
 
 const DocumentList = () => {
   const theme = useTheme();
@@ -55,6 +58,10 @@ const DocumentList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [documentToAct, setDocumentToAct] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [alert, setAlert] = useState({
     open: false,
     message: '',
@@ -162,6 +169,50 @@ const DocumentList = () => {
   const openDeleteDialog = (document) => {
     setDocumentToDelete(document);
     setDeleteDialogOpen(true);
+  };
+
+  // Open approve/reject dialogs
+  const openApproveDialog = (document) => {
+    setDocumentToAct(document);
+    setApproveDialogOpen(true);
+  };
+
+  const openRejectDialog = (document) => {
+    setDocumentToAct(document);
+    setRejectDialogOpen(true);
+  };
+
+  // Approve document
+  const handleApproveDocument = async () => {
+    if (!documentToAct) return;
+    try {
+      await documentService.approveDocument(documentToAct.id);
+      setAlert({ open: true, message: 'Document approved successfully', severity: 'success' });
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error approving document:', error);
+      setAlert({ open: true, message: 'Failed to approve document.', severity: 'error' });
+    } finally {
+      setApproveDialogOpen(false);
+      setDocumentToAct(null);
+    }
+  };
+
+  // Reject document
+  const handleRejectDocument = async () => {
+    if (!documentToAct) return;
+    try {
+      await documentService.rejectDocument(documentToAct.id, rejectReason || 'Rejected by admin');
+      setAlert({ open: true, message: 'Document rejected successfully', severity: 'success' });
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error rejecting document:', error);
+      setAlert({ open: true, message: 'Failed to reject document.', severity: 'error' });
+    } finally {
+      setRejectDialogOpen(false);
+      setDocumentToAct(null);
+      setRejectReason('');
+    }
   };
 
   // Handle download document as PDF
@@ -382,6 +433,32 @@ const DocumentList = () => {
                         </IconButton>
                       </Tooltip>
                       
+                      {/* Admin approve/reject for pending */}
+                      {user?.role === 'admin' && document.status === 'pending' && (
+                        <>
+                          <Tooltip title="Approve">
+                            <IconButton 
+                              onClick={() => openApproveDialog(document)}
+                              size="small"
+                              color="success"
+                              sx={{ ml: 0.5 }}
+                            >
+                              <CheckCircleIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Reject">
+                            <IconButton 
+                              onClick={() => openRejectDialog(document)}
+                              size="small"
+                              color="error"
+                              sx={{ ml: 0.5 }}
+                            >
+                              <CancelIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+
                       {canDeleteDocument(document) && (
                         <Tooltip title="Delete">
                           <IconButton 
@@ -423,10 +500,53 @@ const DocumentList = () => {
           setDeleteDialogOpen(false);
           setDocumentToDelete(null);
         }}
-        confirmButtonText="Delete"
-        cancelButtonText="Cancel"
+        confirmText="Delete"
+        cancelText="Cancel"
         severity="error"
       />
+
+      {/* Approve confirmation dialog */}
+      <ConfirmDialog
+        open={approveDialogOpen}
+        title="Approve Document"
+        message={`Are you sure you want to approve "${documentToAct?.title || ''}"?`}
+        onConfirm={handleApproveDocument}
+        onCancel={() => {
+          setApproveDialogOpen(false);
+          setDocumentToAct(null);
+        }}
+        confirmText="Approve"
+        cancelText="Cancel"
+        severity="success"
+      />
+
+      {/* Reject confirmation dialog with reason */}
+      <ConfirmDialog
+        open={rejectDialogOpen}
+        title="Reject Document"
+        message={`Provide a reason and confirm to reject "${documentToAct?.title || ''}".`}
+        onConfirm={handleRejectDocument}
+        onCancel={() => {
+          setRejectDialogOpen(false);
+          setDocumentToAct(null);
+          setRejectReason('');
+        }}
+        confirmText="Reject"
+        cancelText="Cancel"
+        severity="error"
+      >
+        <Box sx={{ mt: 2 }}>
+          <TextField
+            label="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            placeholder="Provide a reason for rejection"
+          />
+        </Box>
+      </ConfirmDialog>
 
       {/* Alert message */}
       <AlertMessage

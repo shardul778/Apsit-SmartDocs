@@ -19,6 +19,7 @@ const ConfirmDialog = ({
   confirmButtonProps = {},
   cancelButtonProps = {},
   severity = 'error',
+  children,
 }) => {
   const handleCancel = () => {
     if (onCancel) {
@@ -60,6 +61,7 @@ const ConfirmDialog = ({
         <DialogContentText id="confirm-dialog-description">
           {message}
         </DialogContentText>
+        {children}
       </DialogContent>
       <DialogActions>
         <Button

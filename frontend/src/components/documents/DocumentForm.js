@@ -50,6 +50,7 @@ const DocumentForm = () => {
   const [categories, setCategories] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [loading, setLoading] = useState(isEditMode);
+  const [editorKey, setEditorKey] = useState(0);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [formValues, setFormValues] = useState(null);
   const [alert, setAlert] = useState({
@@ -130,6 +131,51 @@ const DocumentForm = () => {
     fetchTemplatesAndCategories();
   }, []);
 
+  // Build initial HTML content from a template definition
+  const buildHtmlFromTemplate = (template) => {
+    try {
+      const lines = [];
+      // Header
+      if (template?.header?.title) {
+        lines.push(`<h2>${template.header.title}</h2>`);
+      }
+      if (template?.header?.subtitle) {
+        lines.push(`<p><em>${template.header.subtitle}</em></p>`);
+      }
+      // Group fields by section and sort by position
+      const fields = Array.isArray(template?.fields) ? [...template.fields] : [];
+      fields.sort((a, b) => (a.position || 0) - (b.position || 0));
+      const sectionToFields = fields.reduce((acc, f) => {
+        const section = f.section || 'Details';
+        if (!acc[section]) acc[section] = [];
+        acc[section].push(f);
+        return acc;
+      }, {});
+      Object.entries(sectionToFields).forEach(([section, sectionFields]) => {
+        if (sectionFields.length === 0) return;
+        if (section && section !== 'default') {
+          lines.push(`<h3>${section}</h3>`);
+        }
+        lines.push('<ul>');
+        sectionFields.forEach((f) => {
+          // Skip non-textual inputs in the initial content body
+          if (['image', 'signature'].includes(f.type)) return;
+          const label = f.label || f.name;
+          const placeholder = f.placeholder || `[${label}]`;
+          lines.push(`<li><strong>${label}:</strong> ${placeholder}</li>`);
+        });
+        lines.push('</ul>');
+      });
+      // Footer
+      if (template?.footer?.text) {
+        lines.push(`<p>${template.footer.text}</p>`);
+      }
+      return lines.join('\n');
+    } catch (e) {
+      return '';
+    }
+  };
+
   // Handle template selection
   const handleTemplateChange = async (event, setFieldValue) => {
     const templateId = event.target.value;
@@ -139,11 +185,19 @@ const DocumentForm = () => {
       try {
         const template = await templateService.getTemplateById(templateId);
         // Update form values with template data
-        setFieldValue('category', template.category);
-        setFieldValue('content', template.content);
+        setFieldValue('category', template.category || '');
+        setFieldValue('templateId', template.id || template._id || templateId);
+        // Prefer explicit template.content; then fall back to first field defaultValue; then build from fields
+        const html = (template.content && template.content.trim().length > 0)
+          ? template.content
+          : (Array.isArray(template.fields) && template.fields[0]?.defaultValue
+              ? template.fields[0].defaultValue
+              : buildHtmlFromTemplate(template));
+        setFieldValue('content', html);
+        setEditorKey((k) => k + 1);
         // Don't override the title if it's already set
-        if (!document?.title) {
-          setFieldValue('title', template.name);
+        if (!document?.title && !initialValues.title) {
+          setFieldValue('title', template.name || '');
         }
       } catch (error) {
         console.error('Error fetching template:', error);
@@ -196,11 +250,11 @@ const DocumentForm = () => {
       let documentId;
       
       if (isEditMode) {
-        await documentService.updateDocument(id, formValues);
-        documentId = id;
+        const updated = await documentService.updateDocument(id, formValues);
+        documentId = updated.id || id;
       } else {
         const newDocument = await documentService.createDocument(formValues);
-        documentId = newDocument.id;
+        documentId = newDocument.id || newDocument._id;
       }
       
       // Submit for approval
@@ -378,6 +432,7 @@ const DocumentForm = () => {
                   
                   <Box sx={{ mb: 2 }}>
                     <Editor
+                      key={editorKey}
                       apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
                       value={values.content}
                       init={{

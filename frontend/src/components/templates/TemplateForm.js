@@ -285,7 +285,8 @@ const TemplateForm = () => {
         throw new Error('Template content is required');
       }
       
-      let templateData = { ...values };
+      // Persist the editor content into the template.content field
+      let templateData = { ...values, content: values.fields[0].defaultValue };
       let templateId;
       
       if (isEditMode) {

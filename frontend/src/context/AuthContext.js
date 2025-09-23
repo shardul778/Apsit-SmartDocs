@@ -170,7 +170,9 @@ export const AuthProvider = ({ children }) => {
   // Get profile image URL
   const getProfileImageUrl = () => {
     if (!user || !user.hasProfileImage) return null;
-    return `/api/auth/profile/image?${new Date().getTime()}`; // Add timestamp to prevent caching
+    const token = localStorage.getItem('token');
+    const ts = new Date().getTime();
+    return `/api/auth/profile/image?token=${encodeURIComponent(token || '')}&_=${ts}`; // Send token for <img> and prevent caching
   };
 
   // Upload signature
@@ -207,7 +209,9 @@ export const AuthProvider = ({ children }) => {
   // Get signature URL
   const getSignatureUrl = () => {
     if (!user || !user.hasSignature) return null;
-    return `/api/auth/profile/signature?${new Date().getTime()}`; // Add timestamp to prevent caching
+    const token = localStorage.getItem('token');
+    const ts = new Date().getTime();
+    return `/api/auth/profile/signature?token=${encodeURIComponent(token || '')}&_=${ts}`; // Send token for <img> and prevent caching
   };
 
   // Change password

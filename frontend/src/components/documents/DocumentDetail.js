@@ -9,6 +9,7 @@ import {
   Divider,
   Grid,
   IconButton,
+  TextField,
   Paper,
   Tooltip,
   Typography,
@@ -24,14 +25,14 @@ import {
   Send as SendIcon
 } from '@mui/icons-material';
 import { documentService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, ConfirmDialog, AlertMessage } from '../common';
 
 const DocumentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
-  const { user } = useContext(AuthContext);
+  const { user, isAuthenticated } = useAuth();
   
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,7 @@ const DocumentDetail = () => {
     message: '',
     severity: 'info'
   });
+  const [rejectReason, setRejectReason] = useState('');
 
   // Status color mapping
   const statusColors = {
@@ -146,7 +148,7 @@ const DocumentDetail = () => {
   // Handle reject document
   const handleRejectDocument = async () => {
     try {
-      await documentService.rejectDocument(id);
+      await documentService.rejectDocument(id, rejectReason || 'Rejected by admin');
       setAlert({
         open: true,
         message: 'Document rejected successfully',
@@ -162,13 +164,14 @@ const DocumentDetail = () => {
       });
     } finally {
       setRejectDialogOpen(false);
+      setRejectReason('');
     }
   };
 
   // Handle download document as PDF
   const handleDownloadPdf = async () => {
     try {
-      await documentService.generatePdf(id);
+      await documentService.generatePDF(id);
       // The actual download will be handled by the browser
     } catch (error) {
       console.error('Error downloading document:', error);
@@ -182,17 +185,19 @@ const DocumentDetail = () => {
 
   // Check if user can edit the document
   const canEditDocument = (document) => {
-    return document.userId === user._id || user.role === 'admin';
+    const createdById = document?.createdBy?._id || document?.createdBy?.id || document?.userId;
+    const userId = user?._id || user?.id;
+    return isAuthenticated && userId && (userId === createdById || user?.role === 'admin');
   };
 
   // Check if user can delete the document
-  const canDeleteDocument = (document) => {
-    return document.userId === user._id || user.role === 'admin';
-  };
+  const canDeleteDocument = (document) => canEditDocument(document);
 
   // Check if user can submit the document for approval
   const canSubmitDocument = (document) => {
-    return (document.userId === user._id || user.role === 'admin') && document.status === 'draft';
+    const createdById = document?.createdBy?._id || document?.createdBy?.id || document?.userId;
+    const userId = user?._id || user?.id;
+    return isAuthenticated && userId && (userId === createdById || user?.role === 'admin') && document.status === 'draft';
   };
 
   // Check if user can approve/reject the document
@@ -233,11 +238,11 @@ const DocumentDetail = () => {
     <Box sx={{ p: 3 }}>
       <PageHeader 
         title={document.title}
-        subtitle={`Document ID: ${document._id}`}
+        subtitle={`Document ID: ${document.id || document._id}`}
         breadcrumbs={[
           { label: 'Dashboard', link: '/' },
           { label: 'Documents', link: '/documents' },
-          { label: document.title, link: `/documents/${document.id}` }
+          { label: document.title, link: `/documents/${document.id || id}` }
         ]}
         action={{
           label: 'Back to Documents',
@@ -268,7 +273,7 @@ const DocumentDetail = () => {
             <Grid item xs={12} sm={6} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               {/* Document actions */}
               <Box>
-                {canEditDocument() && (
+                {canEditDocument(document) && (
                   <Tooltip title="Edit Document">
                     <IconButton 
                       component={Link} 
@@ -291,7 +296,7 @@ const DocumentDetail = () => {
                   </IconButton>
                 </Tooltip>
                 
-                {canDeleteDocument() && (
+                {canDeleteDocument(document) && (
                   <Tooltip title="Delete Document">
                     <IconButton 
                       onClick={() => setDeleteDialogOpen(true)}
@@ -310,7 +315,7 @@ const DocumentDetail = () => {
             <>
               <Divider sx={{ my: 2 }} />
               <Box display="flex" justifyContent="flex-end">
-                {canSubmitDocument() && (
+                {canSubmitDocument(document) && (
                   <Button
                     variant="contained"
                     color="primary"
@@ -429,7 +434,7 @@ const DocumentDetail = () => {
           minHeight: '300px'
         }}>
           {/* This would typically be rendered HTML content from the document */}
-          <div dangerouslySetInnerHTML={{ __html: document.content || '<p>No content available</p>' }} />
+          <div dangerouslySetInnerHTML={{ __html: document?.content?.body || document?.content || '<p>No content available</p>' }} />
         </Box>
       </Paper>
 
@@ -440,8 +445,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to delete "${document.title}"? This action cannot be undone.`}
         onConfirm={handleDeleteDocument}
         onCancel={() => setDeleteDialogOpen(false)}
-        confirmButtonText="Delete"
-        cancelButtonText="Cancel"
+        confirmText="Delete"
+        cancelText="Cancel"
         severity="error"
       />
 
@@ -452,8 +457,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to submit "${document.title}" for approval? Once submitted, you won't be able to edit it until it's approved or rejected.`}
         onConfirm={handleSubmitDocument}
         onCancel={() => setSubmitDialogOpen(false)}
-        confirmButtonText="Submit"
-        cancelButtonText="Cancel"
+        confirmText="Submit"
+        cancelText="Cancel"
         severity="warning"
       />
 
@@ -464,8 +469,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to approve "${document.title}"?`}
         onConfirm={handleApproveDocument}
         onCancel={() => setApproveDialogOpen(false)}
-        confirmButtonText="Approve"
-        cancelButtonText="Cancel"
+        confirmText="Approve"
+        cancelText="Cancel"
         severity="success"
       />
 
@@ -476,10 +481,22 @@ const DocumentDetail = () => {
         message={`Are you sure you want to reject "${document.title}"?`}
         onConfirm={handleRejectDocument}
         onCancel={() => setRejectDialogOpen(false)}
-        confirmButtonText="Reject"
-        cancelButtonText="Cancel"
+        confirmText="Reject"
+        cancelText="Cancel"
         severity="error"
-      />
+      >
+        <Box sx={{ mt: 2 }}>
+          <TextField
+            label="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            placeholder="Provide a reason for rejection"
+          />
+        </Box>
+      </ConfirmDialog>
 
       {/* Alert message */}
       <AlertMessage

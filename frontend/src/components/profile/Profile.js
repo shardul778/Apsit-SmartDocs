@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -25,6 +25,7 @@ import {
   Draw as DrawIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import axios from '../../services/axiosConfig';
 import { PageHeader, AlertMessage, LoadingSpinner } from '../common';
 
 const Profile = () => {
@@ -37,6 +38,74 @@ const Profile = () => {
     new: false,
     confirm: false,
   });
+  const [profileSrc, setProfileSrc] = useState(null);
+  const [signatureSrc, setSignatureSrc] = useState(null);
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
+
+  // Load images as blobs to ensure auth headers are applied
+  const loadProfileImage = async (force = false) => {
+    try {
+      const maxRetries = 5;
+      const delayMs = 300;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const ts = Date.now();
+          const response = await axios.get(`/api/auth/profile/image?_=${ts}`, { responseType: 'blob' });
+          const contentType = (response.headers && response.headers['content-type']) || '';
+          const blob = response.data;
+          if (contentType.startsWith('image/') && blob && blob.size > 0) {
+            const objectUrl = URL.createObjectURL(blob);
+            setProfileSrc((prev) => {
+              if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+              return objectUrl;
+            });
+            setProfileReloadKey((k) => k + 1);
+            return;
+          }
+        } catch (inner) {}
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    } catch (e) {
+      // Keep existing preview/source on failure
+    }
+  };
+
+  const loadSignatureImage = async (force = false) => {
+    try {
+      const maxRetries = 5;
+      const delayMs = 300;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const ts = Date.now();
+          const response = await axios.get(`/api/auth/profile/signature?_=${ts}`, { responseType: 'blob' });
+          const contentType = (response.headers && response.headers['content-type']) || '';
+          const blob = response.data;
+          if (contentType.startsWith('image/') && blob && blob.size > 0) {
+            const objectUrl = URL.createObjectURL(blob);
+            setSignatureSrc((prev) => {
+              if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+              return objectUrl;
+            });
+            return;
+          }
+        } catch (inner) {}
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    } catch (e) {
+      // Keep existing preview/source on failure
+    }
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+    loadSignatureImage();
+    // Cleanup object URLs on unmount
+    return () => {
+      if (profileSrc) URL.revokeObjectURL(profileSrc);
+      if (signatureSrc) URL.revokeObjectURL(signatureSrc);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.hasProfileImage, user?.hasSignature]);
 
   // Profile update form
   const profileFormik = useFormik({
@@ -140,6 +209,17 @@ const Profile = () => {
       return;
     }
 
+
+    // Immediate local preview
+    try {
+      const localUrl = URL.createObjectURL(file);
+      setProfileSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return localUrl;
+      });
+      setProfileReloadKey((k) => k + 1);
+    } catch (e) {}
+
     setLoading(true);
     try {
       await uploadProfileImage(file);
@@ -148,6 +228,7 @@ const Profile = () => {
         message: 'Profile image updated successfully',
         severity: 'success',
       });
+      await loadProfileImage(true);
     } catch (error) {
       setAlert({
         open: true,
@@ -156,6 +237,8 @@ const Profile = () => {
       });
     } finally {
       setLoading(false);
+      // reset input to allow re-uploading the same file name
+      try { event.target.value = ''; } catch (e) {}
     }
   };
 
@@ -192,6 +275,7 @@ const Profile = () => {
         message: 'Signature updated successfully',
         severity: 'success',
       });
+      await loadSignatureImage();
     } catch (error) {
       setAlert({
         open: true,
@@ -246,7 +330,8 @@ const Profile = () => {
                   <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Box sx={{ position: 'relative', mb: 3 }}>
                       <Avatar
-                        src={getProfileImageUrl()}
+                        key={profileReloadKey}
+                        src={profileSrc || getProfileImageUrl() || undefined}
                         alt={user?.name}
                         sx={{ width: 150, height: 150, mb: 2 }}
                       />
@@ -331,7 +416,7 @@ const Profile = () => {
                       {user?.hasSignature ? (
                         <Box
                           component="img"
-                          src={getSignatureUrl()}
+                          src={signatureSrc || getSignatureUrl()}
                           alt="Signature"
                           sx={{ maxWidth: '100%', maxHeight: 100 }}
                         />
