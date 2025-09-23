@@ -94,7 +94,11 @@ export const rejectDocument = async (id, reason) => {
 // Generate PDF
 export const generatePDF = async (id) => {
   const response = await axios.post(`${API_URL}/${id}/pdf`);
-  return response.data.pdfUrl || null;
+  const relativeUrl = response.data.pdfUrl || null;
+  if (!relativeUrl) return null;
+  // Ensure absolute URL so the app doesn't route to SPA 404
+  const base = (axios.defaults.baseURL || '').replace(/\/$/, '');
+  return `${base}${relativeUrl}`;
 };
 
 // Upload attachment to document
@@ -116,4 +120,19 @@ export const uploadAttachment = async (id, file) => {
 export const deleteAttachment = async (documentId, attachmentId) => {
   const response = await axios.delete(`${API_URL}/${documentId}/attachments/${attachmentId}`);
   return response.data || {};
+};
+
+// Download a file (PDF) by URL and trigger browser download
+export const downloadFile = async (url, filename = 'document.pdf') => {
+  if (!url) return;
+  const response = await axios.get(url, { responseType: 'blob' });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(blobUrl);
 };

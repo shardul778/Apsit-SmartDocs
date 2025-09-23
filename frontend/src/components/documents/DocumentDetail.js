@@ -171,8 +171,10 @@ const DocumentDetail = () => {
   // Handle download document as PDF
   const handleDownloadPdf = async () => {
     try {
-      await documentService.generatePDF(id);
-      // The actual download will be handled by the browser
+      const pdfUrl = await documentService.generatePDF(id);
+      if (!pdfUrl) throw new Error('PDF URL not returned');
+      const filename = `${document?.metadata?.documentNumber || document?.title || 'document'}.pdf`;
+      await documentService.downloadFile(pdfUrl, filename);
     } catch (error) {
       console.error('Error downloading document:', error);
       setAlert({
