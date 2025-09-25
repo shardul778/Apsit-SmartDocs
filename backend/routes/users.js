@@ -17,7 +17,7 @@ const {
 
 // All routes below this are protected and require admin role
 router.use(protect);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'superadmin'));
 
 // Get all users
 router.get('/', getUsers);
@@ -34,7 +34,7 @@ router.post(
     check('email', 'Please include a valid email').isEmail(),
     check('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
     check('department', 'Department is required').not().isEmpty(),
-    check('role', 'Role is required').isIn(['user', 'admin']),
+    check('role', 'Role is required').isIn(['user', 'manager', 'admin']),
   ],
   createUser
 );
@@ -46,7 +46,7 @@ router.put(
     check('name', 'Name is required').optional().not().isEmpty(),
     check('email', 'Please include a valid email').optional().isEmail(),
     check('department', 'Department is required').optional().not().isEmpty(),
-    check('role', 'Role must be either user or admin').optional().isIn(['user', 'admin']),
+    check('role', 'Role must be either user, manager or admin').optional().isIn(['user', 'manager', 'admin']),
   ],
   updateUser
 );
@@ -58,7 +58,7 @@ router.delete('/:id', deleteUser);
 router.put(
   '/:id/role',
   [
-    check('role', 'Role must be either user or admin').isIn(['user', 'admin']),
+    check('role', 'Role must be either user, manager or admin').isIn(['user', 'manager', 'admin']),
   ],
   updateUserRole
 );

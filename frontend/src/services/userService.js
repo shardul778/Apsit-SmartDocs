@@ -23,19 +23,20 @@ export const getUsers = async (filters = {}) => {
 // Get user by ID (admin only)
 export const getUserById = async (id) => {
   const response = await axios.get(`${API_URL}/${id}`);
-  return response.data;
+  // Backend returns { success, data: { ...user } }
+  return response.data?.data || response.data;
 };
 
 // Create user (admin only)
 export const createUser = async (userData) => {
   const response = await axios.post(API_URL, userData);
-  return response.data;
+  return response.data?.data || response.data;
 };
 
 // Update user (admin only)
 export const updateUser = async (id, userData) => {
   const response = await axios.put(`${API_URL}/${id}`, userData);
-  return response.data;
+  return response.data?.data || response.data;
 };
 
 // Delete user (admin only)

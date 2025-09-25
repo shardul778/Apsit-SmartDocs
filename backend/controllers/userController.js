@@ -186,7 +186,7 @@ exports.updateUser = async (req, res, next) => {
  */
 exports.deleteUser = async (req, res, next) => {
   try {
-    // Find user
+    // Validate and find user
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -204,15 +204,19 @@ exports.deleteUser = async (req, res, next) => {
       });
     }
 
-    // Delete user
-    await user.remove();
+    // Perform deletion
+    await User.deleteOne({ _id: user._id });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: {},
+      message: 'User deleted successfully',
     });
   } catch (error) {
-    next(error);
+    // Handle invalid ObjectId and other known errors explicitly
+    if (error.name === 'CastError') {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    return res.status(500).json({ success: false, message: 'Failed to delete user' });
   }
 };
 

@@ -68,6 +68,8 @@ const DocumentList = () => {
     severity: 'info'
   });
 
+  // Remove previous aggressive DOM cleanup; rely on proper dialog settings
+
   // Status color mapping
   const statusColors = {
     draft: theme.palette.info.main,
@@ -143,77 +145,79 @@ const DocumentList = () => {
   // Handle delete document
   const handleDeleteDocument = async () => {
     if (!documentToDelete) return;
-    
+    // Close dialog immediately to avoid a lingering backdrop blocking the UI
+    setDeleteDialogOpen(false);
+    const toDelete = documentToDelete;
+    setDocumentToDelete(null);
     try {
-      await documentService.deleteDocument(documentToDelete.id);
-      setAlert({
-        open: true,
-        message: 'Document deleted successfully',
-        severity: 'success'
-      });
-      fetchDocuments(); // Refresh the list
+      await documentService.deleteDocument(toDelete.id);
+      // Ensure any potential MUI focus trap is released
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
+      setAlert({ open: true, message: 'Document deleted successfully', severity: 'success' });
+      fetchDocuments();
     } catch (error) {
       console.error('Error deleting document:', error);
-      setAlert({
-        open: true,
-        message: 'Failed to delete document. Please try again later.',
-        severity: 'error'
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setDocumentToDelete(null);
+      setAlert({ open: true, message: 'Failed to delete document. Please try again later.', severity: 'error' });
     }
   };
 
   // Open delete confirmation dialog
   const openDeleteDialog = (document) => {
     setDocumentToDelete(document);
-    setDeleteDialogOpen(true);
+    // Defer open to next tick to ensure state settles, avoids double backdrops
+    setTimeout(() => setDeleteDialogOpen(true), 0);
   };
 
   // Open approve/reject dialogs
   const openApproveDialog = (document) => {
     setDocumentToAct(document);
-    setApproveDialogOpen(true);
+    setTimeout(() => setApproveDialogOpen(true), 0);
   };
 
   const openRejectDialog = (document) => {
     setDocumentToAct(document);
-    setRejectDialogOpen(true);
+    setTimeout(() => setRejectDialogOpen(true), 0);
   };
 
   // Approve document
   const handleApproveDocument = async () => {
     if (!documentToAct) return;
+    // Close dialog immediately to remove backdrop
+    setApproveDialogOpen(false);
+    const acting = documentToAct;
+    setDocumentToAct(null);
     try {
-      await documentService.approveDocument(documentToAct.id);
+      await documentService.approveDocument(acting.id);
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
       setAlert({ open: true, message: 'Document approved successfully', severity: 'success' });
       fetchDocuments();
     } catch (error) {
       console.error('Error approving document:', error);
       setAlert({ open: true, message: 'Failed to approve document.', severity: 'error' });
-    } finally {
-      setApproveDialogOpen(false);
-      setDocumentToAct(null);
     }
   };
 
   // Reject document
   const handleRejectDocument = async () => {
     if (!documentToAct) return;
+    // Close dialog immediately to remove backdrop
+    setRejectDialogOpen(false);
+    const acting = documentToAct;
+    const reason = rejectReason || 'Rejected by admin';
+    setDocumentToAct(null);
+    setRejectReason('');
     try {
-      await documentService.rejectDocument(documentToAct.id, rejectReason || 'Rejected by admin');
+      await documentService.rejectDocument(acting.id, reason);
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
       setAlert({ open: true, message: 'Document rejected successfully', severity: 'success' });
       fetchDocuments();
     } catch (error) {
       console.error('Error rejecting document:', error);
       setAlert({ open: true, message: 'Failed to reject document.', severity: 'error' });
-    } finally {
-      setRejectDialogOpen(false);
-      setDocumentToAct(null);
-      setRejectReason('');
     }
   };
+
+  // No overlay side-effects needed now that dialog settings are corrected
 
   // Handle download document as PDF
   const handleDownloadPdf = async (documentId) => {
@@ -320,11 +324,10 @@ const DocumentList = () => {
                         label="Category"
                       >
                         <MenuItem value="">All</MenuItem>
-                        <MenuItem value="legal">Legal</MenuItem>
-                        <MenuItem value="hr">HR</MenuItem>
-                        <MenuItem value="finance">Finance</MenuItem>
-                        <MenuItem value="marketing">Marketing</MenuItem>
-                        <MenuItem value="operations">Operations</MenuItem>
+                        <MenuItem value="it">IT</MenuItem>
+                        <MenuItem value="computer science">Computer Science</MenuItem>
+                        <MenuItem value="data science">Data Science</MenuItem>
+                        <MenuItem value="aiml">AIML</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -338,12 +341,10 @@ const DocumentList = () => {
                         label="Department"
                       >
                         <MenuItem value="">All</MenuItem>
-                        <MenuItem value="legal">Legal</MenuItem>
-                        <MenuItem value="hr">HR</MenuItem>
-                        <MenuItem value="finance">Finance</MenuItem>
-                        <MenuItem value="marketing">Marketing</MenuItem>
                         <MenuItem value="it">IT</MenuItem>
-                        <MenuItem value="operations">Operations</MenuItem>
+                        <MenuItem value="computer science">Computer Science</MenuItem>
+                        <MenuItem value="data science">Data Science</MenuItem>
+                        <MenuItem value="aiml">AIML</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>

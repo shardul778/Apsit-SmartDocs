@@ -13,7 +13,8 @@ import {
   Paper,
   Tooltip,
   Typography,
-  useTheme
+  useTheme,
+  Fab
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -45,6 +46,7 @@ const DocumentDetail = () => {
     message: '',
     severity: 'info'
   });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const [rejectReason, setRejectReason] = useState('');
 
   // Status color mapping
@@ -82,20 +84,12 @@ const DocumentDetail = () => {
   const handleDeleteDocument = async () => {
     try {
       await documentService.deleteDocument(id);
-      setAlert({
-        open: true,
-        message: 'Document deleted successfully',
-        severity: 'success'
-      });
+      setToast({ open: true, message: 'Document deleted successfully', severity: 'success' });
       // Navigate back to documents list after a short delay
       setTimeout(() => navigate('/documents'), 1500);
     } catch (error) {
       console.error('Error deleting document:', error);
-      setAlert({
-        open: true,
-        message: 'Failed to delete document. Please try again later.',
-        severity: 'error'
-      });
+      setToast({ open: true, message: 'Failed to delete document. Please try again later.', severity: 'error' });
     } finally {
       setDeleteDialogOpen(false);
     }
@@ -247,12 +241,24 @@ const DocumentDetail = () => {
           { label: document.title, link: `/documents/${document.id || id}` }
         ]}
         action={{
-          label: 'Back to Documents',
+          label: 'Back',
           icon: <ArrowBackIcon />,
-          onClick: () => navigate('/documents'),
-          link: '/documents'
+          onClick: () => navigate('/'),
+          link: '/'
         }}
       />
+
+      {/* Always-visible Back button (even if header action is not rendered) */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/')}
+          data-testid="back-to-dashboard"
+        >
+          Back
+        </Button>
+      </Box>
 
       {/* Document status and actions */}
       <Card sx={{ mb: 3 }}>
@@ -365,6 +371,14 @@ const DocumentDetail = () => {
         <Divider sx={{ mb: 2 }} />
         
         <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Title
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {document.title || 'N/A'}
+            </Typography>
+          </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <Typography variant="subtitle2" color="text.secondary">
               Category
@@ -500,13 +514,34 @@ const DocumentDetail = () => {
         </Box>
       </ConfirmDialog>
 
-      {/* Alert message */}
+      {/* Alert message (legacy) */}
       <AlertMessage
         open={alert.open}
         message={alert.message}
         severity={alert.severity}
         onClose={() => setAlert({ ...alert, open: false })}
       />
+
+      {/* Toast for nicer UX */}
+      <AlertMessage
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+        autoHideDuration={2500}
+        variant="standard"
+        position={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      {/* Floating Back FAB to ensure visibility */}
+      <Fab
+        color="primary"
+        aria-label="back"
+        onClick={() => navigate('/')}
+        sx={{ position: 'fixed', bottom: 16, left: 16, zIndex: 1300 }}
+      >
+        <ArrowBackIcon />
+      </Fab>
     </Box>
   );
 };

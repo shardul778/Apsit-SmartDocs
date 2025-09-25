@@ -372,12 +372,10 @@ const DocumentForm = () => {
                             value={values.department}
                             onChange={handleChange}
                           >
-                            <MenuItem value="legal">Legal</MenuItem>
-                            <MenuItem value="hr">HR</MenuItem>
-                            <MenuItem value="finance">Finance</MenuItem>
-                            <MenuItem value="marketing">Marketing</MenuItem>
                             <MenuItem value="it">IT</MenuItem>
-                            <MenuItem value="operations">Operations</MenuItem>
+                            <MenuItem value="computer science">Computer Science</MenuItem>
+                            <MenuItem value="data science">Data Science</MenuItem>
+                            <MenuItem value="aiml">AIML</MenuItem>
                           </Field>
                           {touched.department && errors.department && (
                             <FormHelperText>{errors.department}</FormHelperText>

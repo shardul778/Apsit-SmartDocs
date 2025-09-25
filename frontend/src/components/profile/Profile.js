@@ -503,6 +503,7 @@ const Profile = () => {
                             value={profileFormik.values.department}
                             onChange={profileFormik.handleChange}
                             onBlur={profileFormik.handleBlur}
+                            placeholder="IT / Computer Science / Data Science / AIML"
                             error={profileFormik.touched.department && Boolean(profileFormik.errors.department)}
                             helperText={profileFormik.touched.department && profileFormik.errors.department}
                           />
