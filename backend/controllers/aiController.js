@@ -288,3 +288,90 @@ exports.getModels = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Classify document text into a category using simple keyword matching
+ * @route   POST /api/ai/classify
+ * @access  Private
+ */
+exports.classifyText = async (req, res, next) => {
+  try {
+    const { text, content } = req.body || {};
+
+    // Build a plain text input from either raw text or content object
+    let inputText = '';
+    if (typeof text === 'string' && text.trim().length > 0) {
+      inputText = text.toLowerCase();
+    } else if (content && typeof content === 'object') {
+      try {
+        inputText = Object.values(content)
+          .filter(v => typeof v === 'string')
+          .join(' ') 
+          .toLowerCase();
+      } catch (e) {
+        inputText = '';
+      }
+    }
+
+    if (!inputText || inputText.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide either text (string) or content (object with strings) to classify'
+      });
+    }
+
+    // Define lightweight keyword rules for categories
+    const rules = [
+      {
+        category: 'Offer Letter',
+        keywords: ['offer letter', 'joining date', 'ctc', 'role', 'designation', 'employment', 'salary']
+      },
+      {
+        category: 'Invoice',
+        keywords: ['invoice', 'total due', 'subtotal', 'gst', 'tax', 'bill to', 'invoice number']
+      },
+      {
+        category: 'ID Proof',
+        keywords: ['identity', 'id card', 'passport', 'aadhaar', 'pan', 'driver license']
+      },
+      {
+        category: 'Application/Request',
+        keywords: ['application', 'request', 'kindly', 'subject', 'respected', 'leave', 'permission']
+      },
+      {
+        category: 'Certificate',
+        keywords: ['certificate', 'certify', 'hereby', 'completion', 'attendance', 'bonafide']
+      }
+    ];
+
+    // Score categories by keyword matches
+    let best = { category: 'Uncategorized', score: 0 };
+    const tokenText = inputText;
+
+    rules.forEach(rule => {
+      let score = 0;
+      rule.keywords.forEach(kw => {
+        if (tokenText.includes(kw)) {
+          score += 1;
+        }
+      });
+      if (score > best.score) {
+        best = { category: rule.category, score };
+      }
+    });
+
+    // Confidence heuristic based on match density
+    const maxPossible = Math.max(...rules.map(r => r.keywords.length));
+    const confidence = best.score === 0 ? 0.2 : Math.min(0.95, 0.4 + best.score / (maxPossible + 1));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        category: best.category,
+        confidence,
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

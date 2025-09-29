@@ -134,6 +134,7 @@ const DocumentList = () => {
       ...prev,
       search: value
     }));
+    setPage(0);
   };
 
   // Handle search submit

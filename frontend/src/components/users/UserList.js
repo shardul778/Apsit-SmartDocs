@@ -131,6 +131,7 @@ const UserList = () => {
       ...prev,
       search: value
     }));
+    setPage(0);
   };
 
   // Handle search submit

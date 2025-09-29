@@ -21,6 +21,15 @@ exports.getUsers = async (req, res, next) => {
       query.department = req.query.department;
     }
 
+    // Case-insensitive search by name or email if provided
+    if (req.query.search && req.query.search.trim()) {
+      const search = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
     // Execute query with pagination
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;

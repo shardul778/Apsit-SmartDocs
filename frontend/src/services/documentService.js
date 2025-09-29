@@ -32,6 +32,7 @@ export const getDocuments = async (filters = {}) => {
   if (filters.status) queryParams.append('status', filters.status);
   if (filters.category) queryParams.append('category', filters.category);
   if (filters.department) queryParams.append('department', filters.department);
+  if (filters.search) queryParams.append('search', filters.search);
   if (filters.page) queryParams.append('page', filters.page);
   if (filters.limit) queryParams.append('limit', filters.limit);
   

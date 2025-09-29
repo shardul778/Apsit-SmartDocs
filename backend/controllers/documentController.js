@@ -196,6 +196,12 @@ exports.getDocuments = async (req, res, next) => {
       query['metadata.department'] = req.query.department;
     }
 
+    // Title search (case-insensitive contains) if 'search' provided
+    if (req.query.search && req.query.search.trim()) {
+      const search = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.title = { $regex: search, $options: 'i' };
+    }
+
     // Execute query with pagination
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;

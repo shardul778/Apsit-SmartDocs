@@ -7,7 +7,8 @@ const router = express.Router();
 // Import controllers
 const {
   generateText,
-  getModels
+  getModels,
+  classifyText
 } = require('../controllers/aiController');
 
 // All routes below this are protected (temporarily disabled for testing)
@@ -37,5 +38,8 @@ router.post(
   ],
   generateText
 );
+
+// Classify text/content
+router.post('/classify', classifyText);
 
 module.exports = router;
