@@ -168,7 +168,8 @@ const DocumentViewer = ({ documentId }) => {
               borderRadius: 1,
               p: 2,
               minHeight: '400px',
-              backgroundColor: '#fafafa'
+              backgroundColor: '#fafafa',
+              '& p': { color: '#000 !important' },
             }}
             dangerouslySetInnerHTML={{ __html: document?.content?.body || document?.content || '' }}
           />

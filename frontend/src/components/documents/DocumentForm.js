@@ -21,7 +21,10 @@ import {
 import {
   Save as SaveIcon,
   Send as SendIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
+  RestartAlt as ResetZoomIcon
 } from '@mui/icons-material';
 import { documentService, templateService } from '../../services';
 import { useAuth } from '../../context/AuthContext';
@@ -51,6 +54,7 @@ const DocumentForm = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [loading, setLoading] = useState(isEditMode);
   const [editorKey, setEditorKey] = useState(0);
+  const [zoom, setZoom] = useState(1);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [formValues, setFormValues] = useState(null);
   const [alert, setAlert] = useState({
@@ -429,25 +433,175 @@ const DocumentForm = () => {
                   <Divider sx={{ mb: 3 }} />
                   
                   <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setZoom((z) => Math.max(0.5, parseFloat((z - 0.1).toFixed(2))))}
+                        startIcon={<ZoomOutIcon />}
+                      >
+                        Zoom Out
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setZoom(1)}
+                        startIcon={<ResetZoomIcon />}
+                      >
+                        100%
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setZoom((z) => Math.min(2, parseFloat((z + 0.1).toFixed(2))))}
+                        startIcon={<ZoomInIcon />}
+                      >
+                        Zoom In
+                      </Button>
+                      <Typography variant="caption" sx={{ ml: 1 }}>
+                        {Math.round(zoom * 100)}%
+                      </Typography>
+                    </Box>
                     <Editor
-                      key={editorKey}
+                      key={`${editorKey}-${zoom}`}
                       apiKey="n0r9qv8xkmaybvmvjcoli20a4x7rznaa8bxoc6am16em7d03" // Replace with your TinyMCE API key
                       value={values.content}
                       init={{
-                        height: 500,
+                        height: 1000,
                         menubar: true,
                         plugins: [
                           'advlist autolink lists link image charmap print preview anchor',
-                          'searchreplace visualblocks code fullscreen',
+                          'searchreplace visualblocks code fullscreen pagebreak',
                           'insertdatetime media table paste code help wordcount'
                         ],
-                        toolbar:
-                          // eslint-disable-next-line no-multi-str
-                          'undo redo | formatselect | bold italic backcolor | \
-                          alignleft aligncenter alignright alignjustify | \
-                          bullist numlist outdent indent | aitext templates citation tableofcontents | removeformat | help',
+                        toolbar: 'undo redo | formatselect | bold italic backcolor | pagebreak | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | aitext templates citation tableofcontents | removeformat | help',
+                        pagebreak_split_block: true,
+                        pagebreak_separator: '<div style="page-break-before:always"></div>',
+                        content_style:
+                          `html { background: #eaeaea; }` +
+                          `body.mce-content-body { background: transparent; padding: 12px 0; margin: 0; color: #000; zoom: ${zoom}; }` +
+                          `.page { width: 210mm; height: 297mm; margin: 12px auto; background: #ffffff; box-shadow: 0 6px 18px rgba(0,0,0,0.15); border: 1px solid #ddd; border-radius: 2px; box-sizing: border-box; padding: 20mm 15mm; overflow: hidden; }` +
+                          'body.mce-content-body p { color: #000; }' +
+                          'hr.mce-pagebreak, .mce-pagebreak { position: relative; height: 0; border: 0; border-top: 2px dashed #9e9e9e; margin: 18px auto; width: 210mm; }' +
+                          '.mce-pagebreak:before { content: "Page Break"; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; color: #666; font-size: 11px; padding: 0 6px; }' +
+                          '@media print { html { background: transparent; } body.mce-content-body { padding: 0; margin: 0; zoom: 1; } .page { box-shadow: none; border: none; margin: 0; page-break-after: always; } .page:last-child { page-break-after: auto; } .mce-pagebreak { display: none; } }',
                         setup: (editor) => {
                           aiTextPlugin(editor);
+                          let lastAutoBreak = 0;
+                          const getMmToPx = () => {
+                            const doc = editor.getDoc();
+                            const test = doc.createElement('div');
+                            test.style.width = '10mm';
+                            test.style.position = 'absolute';
+                            test.style.visibility = 'hidden';
+                            doc.body.appendChild(test);
+                            const px = test.getBoundingClientRect().width;
+                            doc.body.removeChild(test);
+                            return px / 10;
+                          };
+                          // Ensure first .page wrapper exists
+                          const ensureFirstPageWrapper = () => {
+                            const body = editor.getBody();
+                            if (!body) return;
+                            if (!body.querySelector('div.page')) {
+                              const first = editor.getDoc().createElement('div');
+                              first.className = 'page';
+                              // move existing children into first page
+                              const nodes = Array.from(body.childNodes);
+                              body.appendChild(first);
+                              nodes.forEach((n) => {
+                                if (n !== first) first.appendChild(n);
+                              });
+                            }
+                          };
+                          const tryAutoPageBreak = (force) => {
+                            const now = Date.now();
+                            if (!force && (now - lastAutoBreak < 200)) return;
+                            const bodyEl = editor.getBody();
+                            if (!bodyEl) return;
+                            const mmToPx = getMmToPx();
+                            const pageHeightPx = 297 * mmToPx;
+                            // Measure within current .page container
+                            const selNode = editor.selection.getNode();
+                            const block = editor.dom.getParent(selNode, editor.dom.isBlock) || selNode;
+                            const currentPage = block.closest('div.page') || bodyEl;
+                            const blockBottom = block.offsetTop + block.offsetHeight;
+                            const posInPage = blockBottom;
+                            if (posInPage <= pageHeightPx - (10 * mmToPx)) return;
+                            editor.undoManager.transact(() => {
+                              // If a next page already exists, just move caret into it and avoid creating duplicates
+                              const nextPage = currentPage.nextElementSibling && currentPage.nextElementSibling.classList?.contains('page')
+                                ? currentPage.nextElementSibling
+                                : null;
+                              if (nextPage) {
+                                const doc = editor.getDoc();
+                                let target = nextPage.firstChild;
+                                if (!target) {
+                                  target = doc.createElement('p');
+                                  target.innerHTML = '<br />';
+                                  nextPage.appendChild(target);
+                                }
+                                const rng2 = doc.createRange();
+                                rng2.setStart(target, 0);
+                                rng2.collapse(true);
+                                editor.selection.setRng(rng2);
+                                return;
+                              }
+                              // Otherwise insert a break, create exactly one new page, and move following siblings into it
+                              editor.selection.select(block, true);
+                              editor.selection.collapse(false);
+                              editor.insertContent('<hr class="mce-pagebreak" />');
+                              const body = editor.getBody();
+                              const brk = body.querySelector('hr.mce-pagebreak:last-of-type, .mce-pagebreak:last-of-type');
+                              if (!brk) return;
+                              const doc = editor.getDoc();
+                              const newPage = doc.createElement('div');
+                              newPage.className = 'page';
+                              const pageParent = currentPage.parentNode || body;
+                              pageParent.insertBefore(newPage, currentPage.nextSibling);
+                              // Move nodes after the break into new page (only siblings after break within currentPage)
+                              let cursor = brk.nextSibling;
+                              while (cursor) {
+                                const node = cursor;
+                                cursor = node.nextSibling;
+                                newPage.appendChild(node);
+                              }
+                              // place caret into new page
+                              let para = newPage.firstChild;
+                              if (!para) {
+                                para = doc.createElement('p');
+                                para.innerHTML = '<br />';
+                                newPage.appendChild(para);
+                              }
+                              const rng2 = doc.createRange();
+                              rng2.setStart(para, 0);
+                              rng2.collapse(true);
+                              editor.selection.setRng(rng2);
+                            });
+                            lastAutoBreak = now;
+                          };
+                          editor.on('init', ensureFirstPageWrapper);
+                          editor.on('SetContent', ensureFirstPageWrapper);
+                          editor.on('keydown', (e) => {
+                            if (e.keyCode === 13) { // Enter
+                              const rng = editor.selection.getRng();
+                              if (rng && rng.collapsed) {
+                                // If at end of a page, insert break instead of normal newline
+                                const mm = getMmToPx();
+                                const pageHeightPx = 297 * mm;
+                                const selNode = editor.selection.getNode();
+                                const block = editor.dom.getParent(selNode, editor.dom.isBlock) || selNode;
+                                const page = block.closest('div.page') || editor.getBody();
+                                const blockBottom = block.offsetTop + block.offsetHeight;
+                                // Only when on last line (no next element sibling)
+                                const nextEl = block.nextElementSibling;
+                                if (!nextEl && blockBottom > pageHeightPx - (8 * mm)) {
+                                  e.preventDefault();
+                                  tryAutoPageBreak(true);
+                                }
+                              }
+                            }
+                          });
                         }
                       }}
                       onEditorChange={(content) => setFieldValue('content', content)}
