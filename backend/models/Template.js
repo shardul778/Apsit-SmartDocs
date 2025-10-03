@@ -76,6 +76,10 @@ const TemplateSchema = new mongoose.Schema(
       trim: true,
     },
     fields: [FieldSchema],
+    content: {
+      type: String, // Optional full HTML/body content for the template
+      default: '',
+    },
     header: {
       logo: {
         type: String, // Path to logo image

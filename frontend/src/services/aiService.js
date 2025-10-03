@@ -81,3 +81,10 @@ export const summarizeText = async (prompt, options = {}) => {
 export const expandText = async (prompt, options = {}) => {
   return generateText(prompt, { ...options, type: 'expand' });
 };
+
+// Classify document text or content
+export const classifyText = async (payload) => {
+  // payload: { text?: string, content?: object }
+  const response = await axios.post(`${API_URL}/classify`, payload, { timeout: 10000 });
+  return response.data;
+};

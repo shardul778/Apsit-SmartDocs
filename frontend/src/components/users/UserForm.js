@@ -38,24 +38,26 @@ const UserSchema = Yup.object().shape({
   department: Yup.string().required('Department is required'),
   position: Yup.string().required('Position is required'),
   role: Yup.string().required('Role is required'),
-  password: Yup.string()
-    .when('_isNewUser', {
-      is: true,
-      then: Yup.string()
+  password: Yup.string().when('_isNewUser', {
+    is: true,
+    then: () =>
+      Yup.string()
         .required('Password is required')
         .min(8, 'Password must be at least 8 characters')
         .matches(
           /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\w\W]{8,}$/,
           'Password must contain at least one uppercase letter, one lowercase letter, and one number'
-        )
-    }),
-  confirmPassword: Yup.string()
-    .when('password', {
-      is: val => val && val.length > 0,
-      then: Yup.string()
+        ),
+    otherwise: (schema) => schema.notRequired()
+  }),
+  confirmPassword: Yup.string().when('password', {
+    is: (val) => val && val.length > 0,
+    then: () =>
+      Yup.string()
         .oneOf([Yup.ref('password')], 'Passwords must match')
-        .required('Confirm password is required')
-    })
+        .required('Confirm password is required'),
+    otherwise: (schema) => schema.notRequired()
+  })
 });
 
 const UserForm = () => {
@@ -87,9 +89,9 @@ const UserForm = () => {
     _isNewUser: !isEditMode // Used for conditional validation
   };
 
-  // Check if current user is admin
+  // Check if current user is admin/superadmin
   useEffect(() => {
-    if (currentUser?.role !== 'admin') {
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') {
       setAlert({
         open: true,
         message: 'You do not have permission to access this page',
@@ -100,7 +102,7 @@ const UserForm = () => {
 
   // Fetch user if in edit mode
   useEffect(() => {
-    if (isEditMode && currentUser?.role === 'admin') {
+    if (isEditMode && (currentUser?.role === 'admin' || currentUser?.role === 'superadmin')) {
       const fetchUser = async () => {
         try {
           const data = await userService.getUserById(id);
@@ -160,9 +162,10 @@ const UserForm = () => {
       setTimeout(() => navigate('/users'), 1500);
     } catch (error) {
       console.error('Error saving user:', error);
+      const backendMsg = error?.response?.data?.message || error?.response?.data?.errors?.[0]?.msg;
       setAlert({
         open: true,
-        message: `Failed to ${isEditMode ? 'update' : 'create'} user. Please try again later.`,
+        message: backendMsg || `Failed to ${isEditMode ? 'update' : 'create'} user. Please try again later.`,
         severity: 'error'
       });
     } finally {
@@ -180,7 +183,7 @@ const UserForm = () => {
     setShowConfirmPassword(!showConfirmPassword);
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" color="error" gutterBottom>
@@ -279,12 +282,10 @@ const UserForm = () => {
                             value={values.department}
                             onChange={handleChange}
                           >
-                            <MenuItem value="legal">Legal</MenuItem>
-                            <MenuItem value="hr">HR</MenuItem>
-                            <MenuItem value="finance">Finance</MenuItem>
-                            <MenuItem value="marketing">Marketing</MenuItem>
                             <MenuItem value="it">IT</MenuItem>
-                            <MenuItem value="operations">Operations</MenuItem>
+                            <MenuItem value="computer science">Computer Science</MenuItem>
+                            <MenuItem value="data science">Data Science</MenuItem>
+                            <MenuItem value="aiml">AIML</MenuItem>
                           </Field>
                           {touched.department && errors.department && (
                             <FormHelperText>{errors.department}</FormHelperText>

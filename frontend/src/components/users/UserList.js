@@ -62,9 +62,9 @@ const UserList = () => {
     severity: 'info'
   });
 
-  // Check if current user is admin
+  // Check if current user is admin/superadmin
   useEffect(() => {
-    if (currentUser?.role !== 'admin') {
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') {
       setAlert({
         open: true,
         message: 'You do not have permission to access this page',
@@ -98,7 +98,7 @@ const UserList = () => {
 
   // Initial fetch
   useEffect(() => {
-    if (currentUser?.role === 'admin') {
+    if (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') {
       fetchUsers();
     }
   }, [page, rowsPerPage, filters, currentUser]);
@@ -131,6 +131,7 @@ const UserList = () => {
       ...prev,
       search: value
     }));
+    setPage(0);
   };
 
   // Handle search submit
@@ -153,9 +154,10 @@ const UserList = () => {
       fetchUsers(); // Refresh the list
     } catch (error) {
       console.error('Error deleting user:', error);
+      const backendMsg = error?.response?.data?.message || error?.response?.data?.error;
       setAlert({
         open: true,
-        message: 'Failed to delete user. Please try again later.',
+        message: backendMsg || 'Failed to delete user. Please try again later.',
         severity: 'error'
       });
     } finally {
@@ -197,11 +199,11 @@ const UserList = () => {
 
   // Check if user can be deleted
   const canDeleteUser = (user) => {
-    // Cannot delete yourself or other admins if you're not a super admin
-    return user._id !== currentUser?._id && !(user.role === 'admin' && currentUser?.role !== 'superadmin');
+    // Admin or Superadmin can delete anyone except themselves
+    return currentUser && user._id !== currentUser._id;
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin') {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" color="error" gutterBottom>
@@ -298,12 +300,10 @@ const UserList = () => {
                         label="Department"
                       >
                         <MenuItem value="">All</MenuItem>
-                        <MenuItem value="legal">Legal</MenuItem>
-                        <MenuItem value="hr">HR</MenuItem>
-                        <MenuItem value="finance">Finance</MenuItem>
-                        <MenuItem value="marketing">Marketing</MenuItem>
                         <MenuItem value="it">IT</MenuItem>
-                        <MenuItem value="operations">Operations</MenuItem>
+                        <MenuItem value="computer science">Computer Science</MenuItem>
+                        <MenuItem value="data science">Data Science</MenuItem>
+                        <MenuItem value="aiml">AIML</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>

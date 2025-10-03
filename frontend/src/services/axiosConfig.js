@@ -1,8 +1,9 @@
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
 
 // Create axios instance
-const instance = axios.create();
+const instance = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000'
+});
 
 // Add request interceptor
 instance.interceptors.request.use(

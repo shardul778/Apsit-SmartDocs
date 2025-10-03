@@ -32,11 +32,14 @@ import {
   FileDownload as FileDownloadIcon,
   Visibility as VisibilityIcon,
   Search as SearchIcon,
-  FilterList as FilterListIcon
+  FilterList as FilterListIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { documentService } from '../../services';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, EmptyState, ConfirmDialog, AlertMessage } from '../common';
+import { DialogContentText, TextField as MuiTextField } from '@mui/material';
 
 const DocumentList = () => {
   const theme = useTheme();
@@ -55,11 +58,17 @@ const DocumentList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [documentToAct, setDocumentToAct] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [alert, setAlert] = useState({
     open: false,
     message: '',
     severity: 'info'
   });
+
+  // Remove previous aggressive DOM cleanup; rely on proper dialog settings
 
   // Status color mapping
   const statusColors = {
@@ -125,6 +134,7 @@ const DocumentList = () => {
       ...prev,
       search: value
     }));
+    setPage(0);
   };
 
   // Handle search submit
@@ -136,33 +146,79 @@ const DocumentList = () => {
   // Handle delete document
   const handleDeleteDocument = async () => {
     if (!documentToDelete) return;
-    
+    // Close dialog immediately to avoid a lingering backdrop blocking the UI
+    setDeleteDialogOpen(false);
+    const toDelete = documentToDelete;
+    setDocumentToDelete(null);
     try {
-      await documentService.deleteDocument(documentToDelete.id);
-      setAlert({
-        open: true,
-        message: 'Document deleted successfully',
-        severity: 'success'
-      });
-      fetchDocuments(); // Refresh the list
+      await documentService.deleteDocument(toDelete.id);
+      // Ensure any potential MUI focus trap is released
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
+      setAlert({ open: true, message: 'Document deleted successfully', severity: 'success' });
+      fetchDocuments();
     } catch (error) {
       console.error('Error deleting document:', error);
-      setAlert({
-        open: true,
-        message: 'Failed to delete document. Please try again later.',
-        severity: 'error'
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setDocumentToDelete(null);
+      setAlert({ open: true, message: 'Failed to delete document. Please try again later.', severity: 'error' });
     }
   };
 
   // Open delete confirmation dialog
   const openDeleteDialog = (document) => {
     setDocumentToDelete(document);
-    setDeleteDialogOpen(true);
+    // Defer open to next tick to ensure state settles, avoids double backdrops
+    setTimeout(() => setDeleteDialogOpen(true), 0);
   };
+
+  // Open approve/reject dialogs
+  const openApproveDialog = (document) => {
+    setDocumentToAct(document);
+    setTimeout(() => setApproveDialogOpen(true), 0);
+  };
+
+  const openRejectDialog = (document) => {
+    setDocumentToAct(document);
+    setTimeout(() => setRejectDialogOpen(true), 0);
+  };
+
+  // Approve document
+  const handleApproveDocument = async () => {
+    if (!documentToAct) return;
+    // Close dialog immediately to remove backdrop
+    setApproveDialogOpen(false);
+    const acting = documentToAct;
+    setDocumentToAct(null);
+    try {
+      await documentService.approveDocument(acting.id);
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
+      setAlert({ open: true, message: 'Document approved successfully', severity: 'success' });
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error approving document:', error);
+      setAlert({ open: true, message: 'Failed to approve document.', severity: 'error' });
+    }
+  };
+
+  // Reject document
+  const handleRejectDocument = async () => {
+    if (!documentToAct) return;
+    // Close dialog immediately to remove backdrop
+    setRejectDialogOpen(false);
+    const acting = documentToAct;
+    const reason = rejectReason || 'Rejected by admin';
+    setDocumentToAct(null);
+    setRejectReason('');
+    try {
+      await documentService.rejectDocument(acting.id, reason);
+      document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.blur();
+      setAlert({ open: true, message: 'Document rejected successfully', severity: 'success' });
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error rejecting document:', error);
+      setAlert({ open: true, message: 'Failed to reject document.', severity: 'error' });
+    }
+  };
+
+  // No overlay side-effects needed now that dialog settings are corrected
 
   // Handle download document as PDF
   const handleDownloadPdf = async (documentId) => {
@@ -269,11 +325,10 @@ const DocumentList = () => {
                         label="Category"
                       >
                         <MenuItem value="">All</MenuItem>
-                        <MenuItem value="legal">Legal</MenuItem>
-                        <MenuItem value="hr">HR</MenuItem>
-                        <MenuItem value="finance">Finance</MenuItem>
-                        <MenuItem value="marketing">Marketing</MenuItem>
-                        <MenuItem value="operations">Operations</MenuItem>
+                        <MenuItem value="it">IT</MenuItem>
+                        <MenuItem value="computer science">Computer Science</MenuItem>
+                        <MenuItem value="data science">Data Science</MenuItem>
+                        <MenuItem value="aiml">AIML</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -287,12 +342,10 @@ const DocumentList = () => {
                         label="Department"
                       >
                         <MenuItem value="">All</MenuItem>
-                        <MenuItem value="legal">Legal</MenuItem>
-                        <MenuItem value="hr">HR</MenuItem>
-                        <MenuItem value="finance">Finance</MenuItem>
-                        <MenuItem value="marketing">Marketing</MenuItem>
                         <MenuItem value="it">IT</MenuItem>
-                        <MenuItem value="operations">Operations</MenuItem>
+                        <MenuItem value="computer science">Computer Science</MenuItem>
+                        <MenuItem value="data science">Data Science</MenuItem>
+                        <MenuItem value="aiml">AIML</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -382,6 +435,32 @@ const DocumentList = () => {
                         </IconButton>
                       </Tooltip>
                       
+                      {/* Admin approve/reject for pending */}
+                      {user?.role === 'admin' && document.status === 'pending' && (
+                        <>
+                          <Tooltip title="Approve">
+                            <IconButton 
+                              onClick={() => openApproveDialog(document)}
+                              size="small"
+                              color="success"
+                              sx={{ ml: 0.5 }}
+                            >
+                              <CheckCircleIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Reject">
+                            <IconButton 
+                              onClick={() => openRejectDialog(document)}
+                              size="small"
+                              color="error"
+                              sx={{ ml: 0.5 }}
+                            >
+                              <CancelIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+
                       {canDeleteDocument(document) && (
                         <Tooltip title="Delete">
                           <IconButton 
@@ -423,10 +502,53 @@ const DocumentList = () => {
           setDeleteDialogOpen(false);
           setDocumentToDelete(null);
         }}
-        confirmButtonText="Delete"
-        cancelButtonText="Cancel"
+        confirmText="Delete"
+        cancelText="Cancel"
         severity="error"
       />
+
+      {/* Approve confirmation dialog */}
+      <ConfirmDialog
+        open={approveDialogOpen}
+        title="Approve Document"
+        message={`Are you sure you want to approve "${documentToAct?.title || ''}"?`}
+        onConfirm={handleApproveDocument}
+        onCancel={() => {
+          setApproveDialogOpen(false);
+          setDocumentToAct(null);
+        }}
+        confirmText="Approve"
+        cancelText="Cancel"
+        severity="success"
+      />
+
+      {/* Reject confirmation dialog with reason */}
+      <ConfirmDialog
+        open={rejectDialogOpen}
+        title="Reject Document"
+        message={`Provide a reason and confirm to reject "${documentToAct?.title || ''}".`}
+        onConfirm={handleRejectDocument}
+        onCancel={() => {
+          setRejectDialogOpen(false);
+          setDocumentToAct(null);
+          setRejectReason('');
+        }}
+        confirmText="Reject"
+        cancelText="Cancel"
+        severity="error"
+      >
+        <Box sx={{ mt: 2 }}>
+          <TextField
+            label="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            placeholder="Provide a reason for rejection"
+          />
+        </Box>
+      </ConfirmDialog>
 
       {/* Alert message */}
       <AlertMessage

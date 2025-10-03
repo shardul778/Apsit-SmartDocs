@@ -14,6 +14,12 @@ exports.protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     }
 
+    // Fallback: allow token via query param for resources fetched by <img> tags
+    // This enables loading protected media like profile images/signatures without custom headers
+    if (!token && req.query && req.query.token) {
+      token = req.query.token;
+    }
+
     // Check if token exists
     if (!token) {
       return res.status(401).json({

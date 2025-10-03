@@ -196,6 +196,12 @@ exports.getDocuments = async (req, res, next) => {
       query['metadata.department'] = req.query.department;
     }
 
+    // Title search (case-insensitive contains) if 'search' provided
+    if (req.query.search && req.query.search.trim()) {
+      const search = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.title = { $regex: search, $options: 'i' };
+    }
+
     // Execute query with pagination
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
@@ -385,15 +391,18 @@ exports.deleteDocument = async (req, res, next) => {
       }
     }
 
-    // Delete document
-    await document.remove();
+    // Delete document using deleteOne (avoid remove() deprecation/behavior issues)
+    await Document.deleteOne({ _id: document._id });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: {},
+      message: 'Document deleted successfully',
     });
   } catch (error) {
-    next(error);
+    if (error.name === 'CastError') {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+    return res.status(500).json({ success: false, message: 'Failed to delete document' });
   }
 };
 

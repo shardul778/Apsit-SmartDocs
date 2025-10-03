@@ -9,10 +9,12 @@ import {
   Divider,
   Grid,
   IconButton,
+  TextField,
   Paper,
   Tooltip,
   Typography,
-  useTheme
+  useTheme,
+  Fab
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -24,14 +26,14 @@ import {
   Send as SendIcon
 } from '@mui/icons-material';
 import { documentService } from '../../services';
-import { AuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { PageHeader, LoadingSpinner, ConfirmDialog, AlertMessage } from '../common';
 
 const DocumentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
-  const { user } = useContext(AuthContext);
+  const { user, isAuthenticated } = useAuth();
   
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,8 @@ const DocumentDetail = () => {
     message: '',
     severity: 'info'
   });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+  const [rejectReason, setRejectReason] = useState('');
 
   // Status color mapping
   const statusColors = {
@@ -80,20 +84,12 @@ const DocumentDetail = () => {
   const handleDeleteDocument = async () => {
     try {
       await documentService.deleteDocument(id);
-      setAlert({
-        open: true,
-        message: 'Document deleted successfully',
-        severity: 'success'
-      });
+      setToast({ open: true, message: 'Document deleted successfully', severity: 'success' });
       // Navigate back to documents list after a short delay
       setTimeout(() => navigate('/documents'), 1500);
     } catch (error) {
       console.error('Error deleting document:', error);
-      setAlert({
-        open: true,
-        message: 'Failed to delete document. Please try again later.',
-        severity: 'error'
-      });
+      setToast({ open: true, message: 'Failed to delete document. Please try again later.', severity: 'error' });
     } finally {
       setDeleteDialogOpen(false);
     }
@@ -146,7 +142,7 @@ const DocumentDetail = () => {
   // Handle reject document
   const handleRejectDocument = async () => {
     try {
-      await documentService.rejectDocument(id);
+      await documentService.rejectDocument(id, rejectReason || 'Rejected by admin');
       setAlert({
         open: true,
         message: 'Document rejected successfully',
@@ -162,14 +158,17 @@ const DocumentDetail = () => {
       });
     } finally {
       setRejectDialogOpen(false);
+      setRejectReason('');
     }
   };
 
   // Handle download document as PDF
   const handleDownloadPdf = async () => {
     try {
-      await documentService.generatePdf(id);
-      // The actual download will be handled by the browser
+      const pdfUrl = await documentService.generatePDF(id);
+      if (!pdfUrl) throw new Error('PDF URL not returned');
+      const filename = `${document?.metadata?.documentNumber || document?.title || 'document'}.pdf`;
+      await documentService.downloadFile(pdfUrl, filename);
     } catch (error) {
       console.error('Error downloading document:', error);
       setAlert({
@@ -182,17 +181,19 @@ const DocumentDetail = () => {
 
   // Check if user can edit the document
   const canEditDocument = (document) => {
-    return document.userId === user._id || user.role === 'admin';
+    const createdById = document?.createdBy?._id || document?.createdBy?.id || document?.userId;
+    const userId = user?._id || user?.id;
+    return isAuthenticated && userId && (userId === createdById || user?.role === 'admin');
   };
 
   // Check if user can delete the document
-  const canDeleteDocument = (document) => {
-    return document.userId === user._id || user.role === 'admin';
-  };
+  const canDeleteDocument = (document) => canEditDocument(document);
 
   // Check if user can submit the document for approval
   const canSubmitDocument = (document) => {
-    return (document.userId === user._id || user.role === 'admin') && document.status === 'draft';
+    const createdById = document?.createdBy?._id || document?.createdBy?.id || document?.userId;
+    const userId = user?._id || user?.id;
+    return isAuthenticated && userId && (userId === createdById || user?.role === 'admin') && document.status === 'draft';
   };
 
   // Check if user can approve/reject the document
@@ -233,19 +234,31 @@ const DocumentDetail = () => {
     <Box sx={{ p: 3 }}>
       <PageHeader 
         title={document.title}
-        subtitle={`Document ID: ${document._id}`}
+        subtitle={`Document ID: ${document.id || document._id}`}
         breadcrumbs={[
           { label: 'Dashboard', link: '/' },
           { label: 'Documents', link: '/documents' },
-          { label: document.title, link: `/documents/${document.id}` }
+          { label: document.title, link: `/documents/${document.id || id}` }
         ]}
         action={{
-          label: 'Back to Documents',
+          label: 'Back',
           icon: <ArrowBackIcon />,
-          onClick: () => navigate('/documents'),
-          link: '/documents'
+          onClick: () => navigate('/'),
+          link: '/'
         }}
       />
+
+      {/* Always-visible Back button (even if header action is not rendered) */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/')}
+          data-testid="back-to-dashboard"
+        >
+          Back
+        </Button>
+      </Box>
 
       {/* Document status and actions */}
       <Card sx={{ mb: 3 }}>
@@ -268,7 +281,7 @@ const DocumentDetail = () => {
             <Grid item xs={12} sm={6} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               {/* Document actions */}
               <Box>
-                {canEditDocument() && (
+                {canEditDocument(document) && (
                   <Tooltip title="Edit Document">
                     <IconButton 
                       component={Link} 
@@ -291,7 +304,7 @@ const DocumentDetail = () => {
                   </IconButton>
                 </Tooltip>
                 
-                {canDeleteDocument() && (
+                {canDeleteDocument(document) && (
                   <Tooltip title="Delete Document">
                     <IconButton 
                       onClick={() => setDeleteDialogOpen(true)}
@@ -310,7 +323,7 @@ const DocumentDetail = () => {
             <>
               <Divider sx={{ my: 2 }} />
               <Box display="flex" justifyContent="flex-end">
-                {canSubmitDocument() && (
+                {canSubmitDocument(document) && (
                   <Button
                     variant="contained"
                     color="primary"
@@ -358,6 +371,14 @@ const DocumentDetail = () => {
         <Divider sx={{ mb: 2 }} />
         
         <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Title
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              {document.title || 'N/A'}
+            </Typography>
+          </Grid>
           <Grid item xs={12} sm={6} md={4}>
             <Typography variant="subtitle2" color="text.secondary">
               Category
@@ -429,7 +450,7 @@ const DocumentDetail = () => {
           minHeight: '300px'
         }}>
           {/* This would typically be rendered HTML content from the document */}
-          <div dangerouslySetInnerHTML={{ __html: document.content || '<p>No content available</p>' }} />
+          <div dangerouslySetInnerHTML={{ __html: document?.content?.body || document?.content || '<p>No content available</p>' }} />
         </Box>
       </Paper>
 
@@ -440,8 +461,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to delete "${document.title}"? This action cannot be undone.`}
         onConfirm={handleDeleteDocument}
         onCancel={() => setDeleteDialogOpen(false)}
-        confirmButtonText="Delete"
-        cancelButtonText="Cancel"
+        confirmText="Delete"
+        cancelText="Cancel"
         severity="error"
       />
 
@@ -452,8 +473,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to submit "${document.title}" for approval? Once submitted, you won't be able to edit it until it's approved or rejected.`}
         onConfirm={handleSubmitDocument}
         onCancel={() => setSubmitDialogOpen(false)}
-        confirmButtonText="Submit"
-        cancelButtonText="Cancel"
+        confirmText="Submit"
+        cancelText="Cancel"
         severity="warning"
       />
 
@@ -464,8 +485,8 @@ const DocumentDetail = () => {
         message={`Are you sure you want to approve "${document.title}"?`}
         onConfirm={handleApproveDocument}
         onCancel={() => setApproveDialogOpen(false)}
-        confirmButtonText="Approve"
-        cancelButtonText="Cancel"
+        confirmText="Approve"
+        cancelText="Cancel"
         severity="success"
       />
 
@@ -476,18 +497,51 @@ const DocumentDetail = () => {
         message={`Are you sure you want to reject "${document.title}"?`}
         onConfirm={handleRejectDocument}
         onCancel={() => setRejectDialogOpen(false)}
-        confirmButtonText="Reject"
-        cancelButtonText="Cancel"
+        confirmText="Reject"
+        cancelText="Cancel"
         severity="error"
-      />
+      >
+        <Box sx={{ mt: 2 }}>
+          <TextField
+            label="Rejection Reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            placeholder="Provide a reason for rejection"
+          />
+        </Box>
+      </ConfirmDialog>
 
-      {/* Alert message */}
+      {/* Alert message (legacy) */}
       <AlertMessage
         open={alert.open}
         message={alert.message}
         severity={alert.severity}
         onClose={() => setAlert({ ...alert, open: false })}
       />
+
+      {/* Toast for nicer UX */}
+      <AlertMessage
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+        autoHideDuration={2500}
+        variant="standard"
+        position={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      {/* Floating Back FAB to ensure visibility */}
+      <Fab
+        color="primary"
+        aria-label="back"
+        onClick={() => navigate('/')}
+        sx={{ position: 'fixed', bottom: 16, left: 16, zIndex: 1300 }}
+      >
+        <ArrowBackIcon />
+      </Fab>
     </Box>
   );
 };

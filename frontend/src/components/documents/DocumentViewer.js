@@ -17,14 +17,14 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { documentService } from '../../services';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 const DocumentViewer = ({ documentId }) => {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { currentUser, isAdmin } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     fetchDocument();
@@ -33,8 +33,8 @@ const DocumentViewer = ({ documentId }) => {
   const fetchDocument = async () => {
     try {
       setLoading(true);
-      const response = await documentService.getDocumentById(documentId);
-      setDocument(response.data);
+      const doc = await documentService.getDocumentById(documentId);
+      setDocument(doc);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch document');
     } finally {
@@ -44,21 +44,19 @@ const DocumentViewer = ({ documentId }) => {
 
   const handleDownload = async () => {
     try {
-      const response = await documentService.generatePDF(documentId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${document.title}.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      const pdfUrl = await documentService.generatePDF(documentId);
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+      } else {
+        setError('Failed to generate PDF');
+      }
     } catch (err) {
       setError('Failed to download document');
     }
   };
 
   const handleEdit = () => {
-    navigate(`/documents/edit/${documentId}`);
+    navigate(`/documents/${documentId}/edit`);
   };
 
   const handleDelete = async () => {
@@ -109,8 +107,10 @@ const DocumentViewer = ({ documentId }) => {
     );
   }
 
-  const canEdit = currentUser && (currentUser._id === document.createdBy._id || isAdmin);
-  const canDelete = currentUser && (currentUser._id === document.createdBy._id || isAdmin);
+  const createdById = document?.createdBy?._id || document?.createdBy?.id;
+  const userId = user?._id || user?.id;
+  const canEdit = isAuthenticated && userId && (userId === createdById);
+  const canDelete = canEdit;
 
   return (
     <Paper elevation={3} sx={{ p: 3 }}>
@@ -168,9 +168,10 @@ const DocumentViewer = ({ documentId }) => {
               borderRadius: 1,
               p: 2,
               minHeight: '400px',
-              backgroundColor: '#fafafa'
+              backgroundColor: '#fafafa',
+              '& p': { color: '#000 !important' },
             }}
-            dangerouslySetInnerHTML={{ __html: document.content }}
+            dangerouslySetInnerHTML={{ __html: document?.content?.body || document?.content || '' }}
           />
         </Grid>
 

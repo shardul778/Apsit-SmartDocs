@@ -342,6 +342,9 @@ exports.getProfileImage = async (req, res, next) => {
     }
     
     res.set('Content-Type', user.profileImage.contentType);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     return res.send(user.profileImage.data);
   } catch (error) {
     next(error);
@@ -365,6 +368,9 @@ exports.getSignature = async (req, res, next) => {
     }
     
     res.set('Content-Type', user.signature.contentType);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     return res.send(user.signature.data);
   } catch (error) {
     next(error);
