@@ -49,6 +49,52 @@ const DocumentDetail = () => {
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const [rejectReason, setRejectReason] = useState('');
 
+  // Function to add page break indicators to content
+  const addPageBreakIndicators = (htmlContent) => {
+    if (!htmlContent) return '';
+    
+    // Split content into logical sections (after headings, long paragraphs)
+    let content = htmlContent;
+    
+    // Add page breaks after major headings (h1, h2)
+    content = content.replace(/<\/h[12][^>]*>/gi, (match) => {
+      return match + '<div class="page-break">--- Page Break ---</div>';
+    });
+    
+    // Add page breaks after long paragraphs (more than 200 characters)
+    content = content.replace(/<\/p>/gi, (match, offset, string) => {
+      // Find the paragraph content
+      const paragraphStart = string.lastIndexOf('<p', offset);
+      const paragraphContent = string.substring(paragraphStart, offset + match.length);
+      const textContent = paragraphContent.replace(/<[^>]*>/g, '');
+      
+      if (textContent.length > 200) {
+        return match + '<div class="page-break">--- Page Break ---</div>';
+      }
+      return match;
+    });
+    
+    // Add page breaks after lists
+    content = content.replace(/<\/ul>/gi, (match) => {
+      return match + '<div class="page-break">--- Page Break ---</div>';
+    });
+    
+    return content;
+  };
+
+  // Function to format content for better readability
+  const formatContent = (content) => {
+    if (!content) return '<p>No content available</p>';
+    
+    // If content is plain text, wrap it in paragraphs
+    if (!content.includes('<')) {
+      const paragraphs = content.split('\n\n').filter(p => p.trim());
+      return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
+    }
+    
+    return content;
+  };
+
   // Status color mapping
   const statusColors = {
     draft: theme.palette.info.main,
@@ -442,15 +488,35 @@ const DocumentDetail = () => {
         </Typography>
         <Divider sx={{ mb: 2 }} />
         
-        <Box sx={{ 
-          p: 2, 
-          border: `1px solid ${theme.palette.divider}`,
-          borderRadius: 1,
-          bgcolor: theme.palette.background.paper,
-          minHeight: '300px'
-        }}>
+        <Box 
+          className="document-content"
+          sx={{ 
+            p: 2, 
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 1,
+            bgcolor: theme.palette.background.paper,
+            minHeight: '500px', // Minimum height for scrolling
+            maxHeight: '70vh', // Maximum height to prevent overflow
+            '&::-webkit-scrollbar': {
+              width: '8px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f1f1f1',
+              borderRadius: '4px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#c1c1c1',
+              borderRadius: '4px',
+              '&:hover': {
+                background: '#a8a8a8',
+              },
+            },
+          }}
+        >
           {/* This would typically be rendered HTML content from the document */}
-          <div dangerouslySetInnerHTML={{ __html: document?.content?.body || document?.content || '<p>No content available</p>' }} />
+          <div dangerouslySetInnerHTML={{ 
+            __html: addPageBreakIndicators(formatContent(document?.content?.body || document?.content || '')) 
+          }} />
         </Box>
       </Paper>
 

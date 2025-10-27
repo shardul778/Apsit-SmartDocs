@@ -316,7 +316,23 @@ const TemplateDetail = () => {
           borderRadius: 1,
           color: 'black',
           bgcolor: theme.palette.background.paper,
-          minHeight: '300px'
+          height: '400px', // Fixed height for scrolling
+          overflowY: 'auto', // Enable vertical scrolling
+          overflowX: 'hidden', // Hide horizontal scroll
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f1f1f1',
+            borderRadius: '4px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#c1c1c1',
+            borderRadius: '4px',
+            '&:hover': {
+              background: '#a8a8a8',
+            },
+          },
         }}>
           {/* Display content from fields structure */}
           {template.fields && template.fields.length > 0 ? (
