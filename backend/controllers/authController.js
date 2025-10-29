@@ -376,3 +376,34 @@ exports.getSignature = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Get admin signature (for testing)
+ * @route   GET /api/auth/admin/signature
+ * @access  Private
+ */
+exports.getAdminSignature = async (req, res, next) => {
+  try {
+    // Find any admin user with signature
+    const adminUser = await User.findOne({ 
+      role: 'admin',
+      signature: { $exists: true, $ne: null },
+      'signature.data': { $exists: true, $ne: null }
+    });
+    
+    if (!adminUser || !adminUser.signature || !adminUser.signature.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'No admin signature found',
+      });
+    }
+    
+    res.set('Content-Type', adminUser.signature.contentType);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    return res.send(adminUser.signature.data);
+  } catch (error) {
+    next(error);
+  }
+};

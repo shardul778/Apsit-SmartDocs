@@ -88,8 +88,8 @@ const DocumentForm = () => {
             });
             setTimeout(() => navigate('/documents'), 2000);
           }
-          // Check if document is in draft status
-          if (data.status !== 'draft') {
+          // Check if document is in draft status (allow admins to edit any status)
+          if (data.status !== 'draft' && user?.role !== 'admin') {
             setAlert({
               open: true,
               message: 'Only documents in draft status can be edited',
