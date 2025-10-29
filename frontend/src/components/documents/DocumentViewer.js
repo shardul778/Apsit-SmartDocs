@@ -8,14 +8,16 @@ import {
   Grid,
   Divider,
   CircularProgress,
-  Alert
+  Alert,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
   Download as DownloadIcon,
   Edit as EditIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { documentService } from '../../services';
 import { useAuth } from '../../context/AuthContext';
 
@@ -155,7 +157,7 @@ const DocumentViewer = ({ documentId }) => {
 
   const createdById = document?.createdBy?._id || document?.createdBy?.id;
   const userId = user?._id || user?.id;
-  const canEdit = isAuthenticated && userId && (userId === createdById);
+  const canEdit = isAuthenticated && userId && (userId === createdById || user?.role === 'admin');
   const canDelete = canEdit;
 
   return (

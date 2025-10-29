@@ -84,6 +84,12 @@ const DocumentSchema = new mongoose.Schema(
       },
       pdfUrl: String,
     }],
+    // Denormalized field for full-text search
+    searchText: {
+      type: String,
+      default: '',
+      index: false,
+    },
   },
   { timestamps: true }
 );
@@ -112,10 +118,47 @@ DocumentSchema.pre('save', async function (next) {
       // Format: DOC-YYYY-MM-XXXX (where XXXX is sequential number)
       this.metadata.documentNumber = `DOC-${year}-${month}-${String(count + 1).padStart(4, '0')}`;
     }
+    
+    // Rebuild searchText if content/title/metadata changed or on new
+    if (this.isNew || this.isModified('title') || this.isModified('content') || this.isModified('metadata')) {
+      const parts = [];
+      if (typeof this.title === 'string') parts.push(this.title);
+      if (this.metadata) {
+        if (this.metadata.documentNumber) parts.push(this.metadata.documentNumber);
+        if (this.metadata.department) parts.push(this.metadata.department);
+        if (this.metadata.category) parts.push(this.metadata.category);
+        if (Array.isArray(this.metadata.tags)) parts.push(this.metadata.tags.join(' '));
+      }
+      if (this.content && typeof this.content === 'object') {
+        Object.values(this.content).forEach(v => {
+          if (typeof v === 'string') parts.push(v);
+        });
+      } else if (typeof this.content === 'string') {
+        parts.push(this.content);
+      }
+      this.searchText = parts.join(' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
     next();
   } catch (error) {
     next(error);
   }
 });
+
+// Weighted text index for improved relevance
+// Title and document number are most important, then tags/category/department, then body content
+DocumentSchema.index(
+  {
+    searchText: 'text',
+    title: 'text',
+  },
+  {
+    weights: {
+      title: 10,
+      searchText: 5,
+    },
+    name: 'DocumentTextIndex',
+    default_language: 'english',
+  }
+);
 
 module.exports = mongoose.model('Document', DocumentSchema);

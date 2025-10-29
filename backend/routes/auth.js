@@ -10,6 +10,7 @@ const {
   getProfileImage,
   uploadSignature, 
   getSignature,
+  getAdminSignature,
   changePassword 
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
@@ -76,6 +77,9 @@ router.put(
 
 // Get signature
 router.get('/profile/signature', protect, getSignature);
+
+// Get admin signature (for testing PDF generation)
+router.get('/admin/signature', protect, getAdminSignature);
 
 // Change password
 router.put(

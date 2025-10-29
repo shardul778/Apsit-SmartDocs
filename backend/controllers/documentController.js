@@ -149,7 +149,8 @@ exports.createDocument = async (req, res, next) => {
       createdBy: req.user._id,
       metadata: {
         ...metadata,
-        department: req.user.department,
+        // Respect explicitly chosen department; fallback to user's department
+        department: (metadata && metadata.department) ? metadata.department : req.user.department,
       },
     });
 
@@ -304,10 +305,15 @@ exports.getDocuments = async (req, res, next) => {
       query['metadata.department'] = req.query.department;
     }
 
-    // Title search (case-insensitive contains) if 'search' provided
+    // Full-text search with fallback if 'search' provided
+    let sort = { createdAt: -1 };
+    let projection = {};
     if (req.query.search && req.query.search.trim()) {
-      const search = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      query.title = { $regex: search, $options: 'i' };
+      const search = req.query.search.trim();
+      // Prefer text search when index is available
+      query.$text = { $search: search };
+      projection = { score: { $meta: 'textScore' } };
+      sort = { score: { $meta: 'textScore' }, createdAt: -1 };
     }
 
     // Execute query with pagination
@@ -315,16 +321,51 @@ exports.getDocuments = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
 
-    const documents = await Document.find(query)
+    let documents = await Document.find(query, projection)
       .populate('template', 'name category')
       .populate('createdBy', 'name')
       .populate('approvedBy', 'name')
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip(startIndex)
       .limit(limit);
 
-    // Get total count
-    const total = await Document.countDocuments(query);
+    // Fallback: if text search yields no results (or index missing), retry with safe regex across title and searchText
+    if ((!documents || documents.length === 0) && req.query.search && req.query.search.trim()) {
+      const safe = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(safe, 'i');
+      const regexQuery = { ...query };
+      delete regexQuery.$text;
+      documents = await Document.find({
+        ...regexQuery,
+        $or: [
+          { title: regex },
+          { searchText: regex },
+        ],
+      })
+        .populate('template', 'name category')
+        .populate('createdBy', 'name')
+        .populate('approvedBy', 'name')
+        .sort({ createdAt: -1 })
+        .skip(startIndex)
+        .limit(limit);
+    }
+
+    // Get total count (respect text or regex search)
+    let total;
+    if (req.query.search && req.query.search.trim()) {
+      if (query.$text) {
+        total = await Document.countDocuments(query);
+      } else {
+        const safe = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(safe, 'i');
+        total = await Document.countDocuments({
+          ...query,
+          $or: [{ title: regex }, { searchText: regex }],
+        });
+      }
+    } else {
+      total = await Document.countDocuments(query);
+    }
 
     res.status(200).json({
       success: true,
@@ -412,8 +453,8 @@ exports.updateDocument = async (req, res, next) => {
       });
     }
 
-    // Check if document is already approved
-    if (document.status === 'approved') {
+    // Check if document is already approved (allow admins to edit approved documents)
+    if (document.status === 'approved' && req.user.role !== 'admin') {
       return res.status(400).json({
         success: false,
         message: 'Cannot update an approved document',
@@ -531,19 +572,19 @@ exports.submitDocument = async (req, res, next) => {
       });
     }
 
-    // Check if user has access to document
-    if (document.createdBy.toString() !== req.user._id.toString()) {
+    // Check if user has access to document (creator or admin)
+    if (req.user.role !== 'admin' && document.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to submit this document',
       });
     }
 
-    // Check if document is already submitted or approved
-    if (document.status !== 'draft' && document.status !== 'rejected') {
+    // Allow submission from any status except 'pending'
+    if (document.status === 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Document is already ${document.status}`,
+        message: 'Document is already pending approval',
       });
     }
 
@@ -657,10 +698,13 @@ exports.rejectDocument = async (req, res, next) => {
  */
 exports.generatePDF = async (req, res, next) => {
   try {
-    // Find document with template and user
-    const document = await Document.findById(req.params.id).populate('template').populate('createdBy');
+    // Find document with template and users
+    const document = await Document.findById(req.params.id)
+      .populate('template')
+      .populate('createdBy')
+      .populate('approvedBy');
     
-    // Find an admin user for signature
+    // Find an admin user for signature (fallback)
     const adminUser = await User.findOne({ role: 'admin' });
 
     if (!document) {
@@ -876,6 +920,16 @@ exports.generatePDF = async (req, res, next) => {
         
         return newPage;
       };
+
+      // Helper function to check if we need a new page
+      const needsNewPage = (requiredHeight) => {
+        return yPosition - requiredHeight < margins.bottom + 50;
+      };
+
+      // Helper function to get proper starting Y position for new page
+      const getNewPageStartY = (page) => {
+        return page.getSize().height - margins.top - 160; // Account for logo + title + spacing
+      };
       
       // Process each line with proper pagination
       for (let i = 0; i < lines.length; i++) {
@@ -908,12 +962,6 @@ exports.generatePDF = async (req, res, next) => {
           lineText = '  ' + line;
         }
         
-        // Check if we need a new page before drawing this line
-        if (yPosition - lineHeight < margins.bottom + 50) {
-          currentPage = await createNewPage();
-          yPosition = currentPage.getSize().height - margins.top - 80;
-        }
-        
         // Word wrap the line if it's too long
         const words = lineText.split(' ');
         let currentLine = '';
@@ -925,9 +973,9 @@ exports.generatePDF = async (req, res, next) => {
           
           if (textWidth > maxWidth && currentLine) {
             // Check if we need a new page for this wrapped line
-            if (yPosition - lineHeight < margins.bottom + 50) {
+            if (needsNewPage(lineHeight)) {
               currentPage = await createNewPage();
-              yPosition = currentPage.getSize().height - margins.top - 80;
+              yPosition = getNewPageStartY(currentPage);
             }
             
             // Draw current line
@@ -948,9 +996,9 @@ exports.generatePDF = async (req, res, next) => {
         // Draw the remaining line
         if (currentLine) {
           // Final check for page space
-          if (yPosition - lineHeight < margins.bottom + 50) {
+          if (needsNewPage(lineHeight)) {
             currentPage = await createNewPage();
-            yPosition = currentPage.getSize().height - margins.top - 80;
+            yPosition = getNewPageStartY(currentPage);
           }
           
           currentPage.drawText(currentLine, {
@@ -964,16 +1012,32 @@ exports.generatePDF = async (req, res, next) => {
         }
       }
       
-      // Add admin signature at the end of the document
-      if (adminUser && adminUser.signature && adminUser.signature.data) {
+      // Resolve which user's signature to use: approving admin > any admin > current admin
+      let signerUser = (document.approvedBy && document.approvedBy.signature && document.approvedBy.signature.data)
+        ? document.approvedBy
+        : (adminUser && adminUser.signature && adminUser.signature.data)
+          ? adminUser
+          : null;
+      if (!signerUser && req.user && req.user.role === 'admin') {
+        const currentAdmin = await User.findById(req.user._id);
+        if (currentAdmin && currentAdmin.signature && currentAdmin.signature.data) {
+          signerUser = currentAdmin;
+        }
+      }
+
+      // ALWAYS add signature section - use image if available, fallback to text
+      console.log('Adding signature to PDF. Signer user:', signerUser ? signerUser.name : 'None');
+      
+      // Add signature at the end of the document
+      if (signerUser && signerUser.signature && signerUser.signature.data) {
         try {
           // Add some space before signature
           yPosition -= 40;
           
           // Check if we need a new page for signature
-          if (yPosition - 100 < margins.bottom + 50) {
+          if (needsNewPage(100)) {
             currentPage = await createNewPage();
-            yPosition = currentPage.getSize().height - margins.top - 80;
+            yPosition = getNewPageStartY(currentPage);
           }
           
           // Draw signature label
@@ -986,27 +1050,70 @@ exports.generatePDF = async (req, res, next) => {
           
           yPosition -= 20;
           
-          // Embed and draw admin signature image
-          const signatureImage = await pdfDoc.embedPng(adminUser.signature.data);
+          // Embed and draw signature image (support PNG and JPEG)
+          let signatureImage;
+          try {
+            if (signerUser.signature.contentType && signerUser.signature.contentType.includes('png')) {
+              signatureImage = await pdfDoc.embedPng(signerUser.signature.data);
+            } else if (signerUser.signature.contentType && (signerUser.signature.contentType.includes('jpeg') || signerUser.signature.contentType.includes('jpg'))) {
+              signatureImage = await pdfDoc.embedJpg(signerUser.signature.data);
+            } else {
+              // Try PNG first, then JPEG as fallback if contentType is missing/unknown
+              try {
+                signatureImage = await pdfDoc.embedPng(signerUser.signature.data);
+              } catch (e) {
+                signatureImage = await pdfDoc.embedJpg(signerUser.signature.data);
+              }
+            }
+          } catch (embedErr) {
+            throw new Error('Unsupported signature image format');
+          }
           
-          // Calculate signature dimensions (max width 150px)
-          const signatureMaxWidth = 150;
+          // Calculate signature dimensions (moderate size - 80px width, 50px height)
+          const signatureMaxWidth = 80;
           const signatureWidth = Math.min(signatureMaxWidth, signatureImage.width);
           const signatureHeight = (signatureImage.height * signatureWidth) / signatureImage.width;
           
-          // Draw signature
-          currentPage.drawImage(signatureImage, {
-            x: margins.left,
-            y: yPosition - signatureHeight,
-            width: signatureWidth,
-            height: signatureHeight,
-          });
+          // Moderate height constraint (max height 50px)
+          const signatureMaxHeight = 50;
+          if (signatureHeight > signatureMaxHeight) {
+            const heightScale = signatureMaxHeight / signatureHeight;
+            const adjustedWidth = signatureWidth * heightScale;
+            const adjustedHeight = signatureMaxHeight;
+            
+            // Draw signature with adjusted dimensions
+            currentPage.drawImage(signatureImage, {
+              x: margins.left,
+              y: yPosition - adjustedHeight,
+              width: adjustedWidth,
+              height: adjustedHeight,
+            });
+            
+            yPosition -= adjustedHeight + 20;
+          } else {
+            // Draw signature with original calculated dimensions
+            currentPage.drawImage(signatureImage, {
+              x: margins.left,
+              y: yPosition - signatureHeight,
+              width: signatureWidth,
+              height: signatureHeight,
+            });
+            
+            yPosition -= signatureHeight + 20;
+          }
           
-          yPosition -= signatureHeight + 20;
-          
-          // Draw admin name below signature
-          if (adminUser.name) {
-            currentPage.drawText(adminUser.name, {
+          // Draw signer name below signature
+          if (signerUser.name) {
+            currentPage.drawText(signerUser.name, {
+              x: margins.left,
+              y: yPosition,
+              size: 10,
+              font,
+            });
+          }
+          if (signerUser.position) {
+            yPosition -= 12;
+            currentPage.drawText(signerUser.position, {
               x: margins.left,
               y: yPosition,
               size: 10,
@@ -1020,6 +1127,58 @@ exports.generatePDF = async (req, res, next) => {
             x: margins.left,
             y: yPosition,
             size: 12,
+            font,
+          });
+        }
+      } else {
+        // NO SIGNATURE IMAGE AVAILABLE - Add text signature with admin info
+        console.log('No signature image available, adding text signature');
+        
+        // Add some space before signature
+        yPosition -= 40;
+        
+        // Check if we need a new page for signature
+        if (needsNewPage(100)) {
+          currentPage = await createNewPage();
+          yPosition = getNewPageStartY(currentPage);
+        }
+        
+        // Draw signature label
+        currentPage.drawText('Signature:', {
+          x: margins.left,
+          y: yPosition,
+          size: 12,
+          font: boldFont,
+        });
+        
+        yPosition -= 20;
+        
+        // Draw signature line
+        currentPage.drawText('_________________________', {
+          x: margins.left,
+          y: yPosition,
+          size: 12,
+          font,
+        });
+        
+        yPosition -= 30;
+        
+        // Draw admin name and position
+        const displayUser = signerUser || adminUser || req.user;
+        if (displayUser && displayUser.name) {
+          currentPage.drawText(displayUser.name, {
+            x: margins.left,
+            y: yPosition,
+            size: 10,
+            font,
+          });
+          yPosition -= 12;
+        }
+        if (displayUser && displayUser.position) {
+          currentPage.drawText(displayUser.position, {
+            x: margins.left,
+            y: yPosition,
+            size: 10,
             font,
           });
         }

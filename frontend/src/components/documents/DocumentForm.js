@@ -78,9 +78,17 @@ const DocumentForm = () => {
       const fetchDocument = async () => {
         try {
           const data = await documentService.getDocumentById(id);
-          setDocument(data);
+          // Normalize backend shape for the form/editor
+          const normalized = {
+            title: data.title || '',
+            category: data.metadata?.category || '',
+            department: data.metadata?.department || user?.department || '',
+            content: typeof data.content === 'string' ? data.content : (data.content?.body || ''),
+            templateId: data.template?.id || data.template?._id || data.templateId || '',
+          };
+          setDocument(normalized);
           // Check if user has permission to edit
-          if (data.userId !== user?.id && user?.role !== 'admin') {
+          if ((data.userId || data.createdBy?._id || data.createdBy?.id) !== (user?.id || user?._id) && user?.role !== 'admin') {
             setAlert({
               open: true,
               message: 'You do not have permission to edit this document',
@@ -88,8 +96,8 @@ const DocumentForm = () => {
             });
             setTimeout(() => navigate('/documents'), 2000);
           }
-          // Check if document is in draft status
-          if (data.status !== 'draft') {
+          // Check if document is in draft status (allow admins to edit any status)
+          if (data.status !== 'draft' && user?.role !== 'admin') {
             setAlert({
               open: true,
               message: 'Only documents in draft status can be edited',
