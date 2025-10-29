@@ -5,9 +5,19 @@ const API_URL = '/api/documents';
 // Normalize backend document shape to always have id
 const mapDocument = (doc) => {
   if (!doc) return doc;
-  if (doc.id) return doc;
-  if (doc._id) return { ...doc, id: doc._id };
-  return doc;
+  const id = doc.id || doc._id;
+  const category = doc.metadata?.category || doc.category || '';
+  const department = doc.metadata?.department || doc.department || '';
+  const createdAt = doc.createdAt || doc.created_on || doc.created_at || null;
+  const userId = doc.createdBy?._id || doc.createdBy?.id || doc.userId || doc.user_id;
+  return {
+    ...doc,
+    id: id || doc.id,
+    category,
+    department,
+    createdAt,
+    userId,
+  };
 };
 
 // Build payload matching backend expectations

@@ -149,7 +149,8 @@ exports.createDocument = async (req, res, next) => {
       createdBy: req.user._id,
       metadata: {
         ...metadata,
-        department: req.user.department,
+        // Respect explicitly chosen department; fallback to user's department
+        department: (metadata && metadata.department) ? metadata.department : req.user.department,
       },
     });
 
@@ -571,19 +572,19 @@ exports.submitDocument = async (req, res, next) => {
       });
     }
 
-    // Check if user has access to document
-    if (document.createdBy.toString() !== req.user._id.toString()) {
+    // Check if user has access to document (creator or admin)
+    if (req.user.role !== 'admin' && document.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to submit this document',
       });
     }
 
-    // Check if document is already submitted or approved
-    if (document.status !== 'draft' && document.status !== 'rejected') {
+    // Allow submission from any status except 'pending'
+    if (document.status === 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Document is already ${document.status}`,
+        message: 'Document is already pending approval',
       });
     }
 
